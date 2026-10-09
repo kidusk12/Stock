@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { ROLES } from '../../config/menu'
-import { t } from '../../i18n/temp'
+import { useTranslation } from 'react-i18next'
+import LanguageToggle from '../../components/LanguageToggle'
 
 // DEV ONLY: removed when the real login is connected.
 const TEST_USERS = [
@@ -14,7 +15,7 @@ const TEST_USERS = [
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-
+  const { t } = useTranslation()
   const signIn = (user) => {
     login(user)
     navigate('/dashboard')
@@ -22,6 +23,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="absolute top-4 right-4"><LanguageToggle /></div>
       <div className="bg-white p-8 rounded-lg shadow w-96">
         <h1 className="text-xl font-bold mb-4">{t('app.name')}</h1>
         <p className="text-xs text-gray-400 mb-3">DEV: pick a role</p>

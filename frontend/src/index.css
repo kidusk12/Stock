@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Placeholder design tokens. Replace with Melat's colors and fonts later. */
 @theme {
   --color-brand: #1f4e79;
   --color-brand-dark: #163a5a;
+  --font-sans: ui-sans-serif, system-ui, 'Noto Sans Ethiopic', sans-serif;
 }

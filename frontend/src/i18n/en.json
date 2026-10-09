@@ -1,0 +1,40 @@
+{
+  "app": {
+    "name": "Stock Management"
+  },
+  "lang": {
+    "label": "Language",
+    "en": "English",
+    "am": "አማርኛ"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "sales": "Sales",
+    "purchases": "Purchases",
+    "transfers": "Transfers",
+    "adjustments": "Adjustments",
+    "products": "Products",
+    "categories": "Categories",
+    "suppliers": "Suppliers",
+    "branches": "Branches",
+    "lowStock": "Low Stock",
+    "reports": "Reports",
+    "auditLog": "Audit Log",
+    "users": "Users",
+    "settings": "Settings"
+  },
+  "auth": {
+    "login": "Log in",
+    "logout": "Log out",
+    "username": "Username",
+    "password": "Password"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "add": "Add",
+    "edit": "Edit",
+    "loading": "Loading..."
+  }
+}

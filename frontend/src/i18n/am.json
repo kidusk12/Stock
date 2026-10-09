@@ -1,0 +1,40 @@
+{
+  "app": {
+    "name": "የክምችት አስተዳደር"
+  },
+  "lang": {
+    "label": "ቋንቋ",
+    "en": "English",
+    "am": "አማርኛ"
+  },
+  "nav": {
+    "dashboard": "ዳሽቦርድ",
+    "sales": "ሽያጭ",
+    "purchases": "ግዢ",
+    "transfers": "ዝውውር",
+    "adjustments": "ማስተካከያ",
+    "products": "ምርቶች",
+    "categories": "ምድቦች",
+    "suppliers": "አቅራቢዎች",
+    "branches": "ቅርንጫፎች",
+    "lowStock": "ዝቅተኛ ክምችት",
+    "reports": "ሪፖርቶች",
+    "auditLog": "የኦዲት መዝገብ",
+    "users": "ተጠቃሚዎች",
+    "settings": "ቅንብሮች"
+  },
+  "auth": {
+    "login": "ግባ",
+    "logout": "ውጣ",
+    "username": "የተጠቃሚ ስም",
+    "password": "የይለፍ ቃል"
+  },
+  "common": {
+    "save": "አስቀምጥ",
+    "cancel": "ይቅር",
+    "search": "ፈልግ",
+    "add": "አክል",
+    "edit": "አርትዕ",
+    "loading": "በመጫን ላይ..."
+  }
+}
