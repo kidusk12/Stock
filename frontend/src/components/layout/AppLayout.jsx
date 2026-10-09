@@ -20,7 +20,7 @@ export default function AppLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b flex items-center justify-end gap-4 px-6">
           <LanguageToggle />
-          <span className="text-sm text-gray-600">{user.name} · {user.role}</span>
+          <span className="text-sm text-gray-600">{user.fullName} · {user.role}</span>
           <button onClick={handleLogout} className="text-sm text-brand hover:underline">
             {t('auth.logout')}
           </button>

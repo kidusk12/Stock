@@ -8,7 +8,7 @@ export const ROLES = {
 
 const { ADMIN, MANAGER, STAFF, AUDITOR } = ROLES
 
-// TEMPORARY: replace the roles arrays with Makda's permissions table when it's ready.
+
 export const MENU = [
   { path: '/dashboard',   labelKey: 'nav.dashboard',   roles: [ADMIN, MANAGER, STAFF, AUDITOR] },
   { path: '/sales',       labelKey: 'nav.sales',       roles: [ADMIN, MANAGER, STAFF] },
@@ -16,10 +16,10 @@ export const MENU = [
   { path: '/transfers',   labelKey: 'nav.transfers',   roles: [ADMIN, MANAGER, STAFF] },
   { path: '/adjustments', labelKey: 'nav.adjustments', roles: [ADMIN, MANAGER, STAFF, AUDITOR] },
   { path: '/products',    labelKey: 'nav.products',    roles: [ADMIN, MANAGER, STAFF] },
-  { path: '/categories',  labelKey: 'nav.categories',  roles: [ADMIN, MANAGER] },
+  { path: '/categories',  labelKey: 'nav.categories',  roles: [ADMIN] },
   { path: '/suppliers',   labelKey: 'nav.suppliers',   roles: [ADMIN, MANAGER] },
   { path: '/branches',    labelKey: 'nav.branches',    roles: [ADMIN] },
-  { path: '/low-stock',   labelKey: 'nav.lowStock',    roles: [ADMIN, MANAGER, STAFF] },
+  { path: '/low-stock',   labelKey: 'nav.lowStock',    roles: [ADMIN, MANAGER] },
   { path: '/reports',     labelKey: 'nav.reports',     roles: [ADMIN, MANAGER, AUDITOR] },
   { path: '/audit-log',   labelKey: 'nav.auditLog',    roles: [ADMIN, MANAGER, AUDITOR] },
   { path: '/users',       labelKey: 'nav.users',       roles: [ADMIN] },

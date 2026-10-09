@@ -36,5 +36,25 @@
     "add": "Add",
     "edit": "Edit",
     "loading": "Loading..."
-  }
+  },
+  "errors": {
+  "VALIDATION_ERROR": "Please check the information you entered.",
+  "WRONG_CURRENT_PASSWORD": "The current password is wrong.",
+  "UNAUTHENTICATED": "Please log in again.",
+  "INVALID_CREDENTIALS": "Wrong username or password.",
+  "FORBIDDEN": "You do not have permission to do this.",
+  "ACCOUNT_DISABLED": "This account has been deactivated.",
+  "NOT_FOUND": "Not found.",
+  "PRODUCT_NOT_FOUND": "Product not found.",
+  "DUPLICATE_SKU": "This SKU already exists.",
+  "DUPLICATE_BARCODE": "This barcode already exists.",
+  "DUPLICATE_VALUE": "This value is already in use.",
+  "INVALID_STATUS": "This action is not allowed in the current status.",
+  "INSUFFICIENT_STOCK": "Not enough stock available.",
+  "OVER_RECEIVE": "You cannot receive more than was ordered.",
+  "RETURN_EXCEEDS_SOLD": "The returned quantity is more than was sold.",
+  "SERVER_ERROR": "A server error occurred. Please try again.",
+  "NETWORK_ERROR": "Cannot reach the server.",
+  "UNKNOWN": "Something went wrong. Please try again."
+}
 }

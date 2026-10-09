@@ -34,7 +34,7 @@ export default function Login() {
               onClick={() => signIn(u)}
               className="border rounded px-4 py-2 text-left hover:bg-gray-100"
             >
-              {u.name} ({u.role})
+              {u.fullName} ({u.role})
             </button>
           ))}
         </div>

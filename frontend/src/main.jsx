@@ -8,6 +8,9 @@ import '@fontsource/noto-sans-ethiopic/400.css'
 import '@fontsource/noto-sans-ethiopic/500.css'
 import '@fontsource/noto-sans-ethiopic/700.css'
 import './i18n'
+import { api } from './lib/api'
+
+if (import.meta.env.DEV) window.api = api // dev only: lets you test from the console
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -1,0 +1,9 @@
+// Codes from the API contract, section 1.4, plus NETWORK_ERROR (raised by the client itself).
+const KNOWN_CODES = [
+  'VALIDATION_ERROR', 'WRONG_CURRENT_PASSWORD', 'UNAUTHENTICATED', 'INVALID_CREDENTIALS',
+  'FORBIDDEN', 'ACCOUNT_DISABLED', 'NOT_FOUND', 'PRODUCT_NOT_FOUND', 'DUPLICATE_SKU',
+  'DUPLICATE_BARCODE', 'DUPLICATE_VALUE', 'INVALID_STATUS', 'INSUFFICIENT_STOCK',
+  'OVER_RECEIVE', 'RETURN_EXCEEDS_SOLD', 'SERVER_ERROR', 'NETWORK_ERROR',
+]
+
+export const errorKey = (err) => (err && KNOWN_CODES.includes(err.code) ? `errors.${err.code}` : 'errors.UNKNOWN')
