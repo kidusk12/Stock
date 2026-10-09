@@ -1,0 +1,60 @@
+{
+  "app": {
+    "name": "የክምችት አስተዳደር"
+  },
+  "lang": {
+    "label": "ቋንቋ",
+    "en": "English",
+    "am": "አማርኛ"
+  },
+  "nav": {
+    "dashboard": "ዳሽቦርድ",
+    "sales": "ሽያጭ",
+    "purchases": "ግዢ",
+    "transfers": "ዝውውር",
+    "adjustments": "ማስተካከያ",
+    "products": "ምርቶች",
+    "categories": "ምድቦች",
+    "suppliers": "አቅራቢዎች",
+    "branches": "ቅርንጫፎች",
+    "lowStock": "ዝቅተኛ ክምችት",
+    "reports": "ሪፖርቶች",
+    "auditLog": "የኦዲት መዝገብ",
+    "users": "ተጠቃሚዎች",
+    "settings": "ቅንብሮች"
+  },
+  "auth": {
+    "login": "ግባ",
+    "logout": "ውጣ",
+    "username": "የተጠቃሚ ስም",
+    "password": "የይለፍ ቃል"
+  },
+  "common": {
+    "save": "አስቀምጥ",
+    "cancel": "ይቅር",
+    "search": "ፈልግ",
+    "add": "አክል",
+    "edit": "አርትዕ",
+    "loading": "በመጫን ላይ..."
+  },
+  "errors": {
+  "VALIDATION_ERROR": "እባክዎ የሞሉትን መረጃ ያረጋግጡ።",
+  "WRONG_CURRENT_PASSWORD": "አሁን ያለው የይለፍ ቃል ትክክል አይደለም።",
+  "UNAUTHENTICATED": "እባክዎ እንደገና ይግቡ።",
+  "INVALID_CREDENTIALS": "የተጠቃሚ ስም ወይም የይለፍ ቃል ትክክል አይደለም።",
+  "FORBIDDEN": "ይህን ለማድረግ ፈቃድ የለዎትም።",
+  "ACCOUNT_DISABLED": "ይህ መለያ ታግዷል።",
+  "NOT_FOUND": "አልተገኘም።",
+  "PRODUCT_NOT_FOUND": "ምርቱ አልተገኘም።",
+  "DUPLICATE_SKU": "ይህ SKU አስቀድሞ አለ።",
+  "DUPLICATE_BARCODE": "ይህ ባርኮድ አስቀድሞ አለ።",
+  "DUPLICATE_VALUE": "ይህ መረጃ አስቀድሞ ተመዝግቧል።",
+  "INVALID_STATUS": "ይህ ተግባር አሁን ባለው ሁኔታ አይፈቀድም።",
+  "INSUFFICIENT_STOCK": "በቂ ክምችት የለም።",
+  "OVER_RECEIVE": "ከታዘዘው በላይ መቀበል አይቻልም።",
+  "RETURN_EXCEEDS_SOLD": "የተመለሰው ብዛት ከተሸጠው ብዛት መብለጥ አይችልም።",
+  "SERVER_ERROR": "የአገልጋይ ችግር ተፈጥሯል። እባክዎ እንደገና ይሞክሩ።",
+  "NETWORK_ERROR": "ከአገልጋዩ ጋር መገናኘት አልተቻለም።",
+  "UNKNOWN": "የሆነ ችግር ተፈጥሯል። እባክዎ እንደገና ይሞክሩ።"
+}
+}
