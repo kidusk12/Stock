@@ -1,0 +1,465 @@
+// Multi-Branch Stock Management System: database schema
+// Owner: Kidus. Place this file at backend/prisma/schema.prisma
+//
+// Rules used everywhere:
+//   - integer auto-increment `id`; foreign keys are named <entity>Id
+//   - camelCase names; createdAt / updatedAt on tables that change
+//   - money is Decimal(12,2); quantities are Decimal(12,2) (two decimals, e.g. 9.12)
+//   - nothing is deleted: users, branches, products, suppliers, categories use isActive
+//   - stock quantity is changed ONLY through the stock movement service
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Role {
+  ADMIN
+  BRANCH_MANAGER
+  STAFF
+  AUDITOR
+}
+
+enum MovementType {
+  OPENING_STOCK
+  PURCHASE_RECEIPT
+  SALE
+  CUSTOMER_RETURN
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+}
+
+enum PoStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+}
+
+enum TransferStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  SHIPPED
+  RECEIVED
+}
+
+enum AdjustmentReason {
+  DAMAGE
+  EXPIRY
+  LOSS
+  RECOUNT
+  OTHER
+}
+
+enum RefundStatus {
+  PENDING_REFUND
+  REFUNDED
+}
+
+enum TaxType {
+  VAT
+  TOT
+}
+
+enum NotificationType {
+  LOW_STOCK
+}
+
+// ---------------------------------------------------------------- people and places
+
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  code      String   @unique
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  stocks         BranchStock[]
+  movements      StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  sales          Sale[]
+  returns        SaleReturn[]
+  transfersOut   Transfer[]      @relation("TransferFrom")
+  transfersIn    Transfer[]      @relation("TransferTo")
+  adjustments    Adjustment[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  fullName     String
+  role         Role
+  branchId     Int? // empty for Admin and Auditor (they see all branches)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  stockMovements    StockMovement[]
+  auditLogs         AuditLog[]
+  poCreated         PurchaseOrder[] @relation("PoCreatedBy")
+  poApproved        PurchaseOrder[] @relation("PoApprovedBy")
+  poRejected        PurchaseOrder[] @relation("PoRejectedBy")
+  sales             Sale[]
+  returnsCreated    SaleReturn[]    @relation("ReturnCreatedBy")
+  returnsRefunded   SaleReturn[]    @relation("ReturnRefundedBy")
+  transfersRequested Transfer[]     @relation("TransferRequestedBy")
+  transfersApproved  Transfer[]     @relation("TransferApprovedBy")
+  transfersRejected  Transfer[]     @relation("TransferRejectedBy")
+  transfersShipped   Transfer[]     @relation("TransferShippedBy")
+  transfersReceived  Transfer[]     @relation("TransferReceivedBy")
+  adjustments       Adjustment[]
+}
+
+// ---------------------------------------------------------------- master data
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String
+  sku          String   @unique
+  barcode      String?  @unique
+  categoryId   Int?
+  unit         String // label only, e.g. piece, kg, box
+  costPrice    Decimal  @db.Decimal(12, 2)
+  sellingPrice Decimal  @db.Decimal(12, 2) // includes tax (VAT or TOT)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  stocks        BranchStock[]
+  movements     StockMovement[]
+  poItems       PurchaseOrderItem[]
+  saleItems     SaleItem[]
+  returnItems   SaleReturnItem[]
+  transferItems TransferItem[]
+  adjustments   Adjustment[]
+  notifications Notification[]
+}
+
+model Supplier {
+  id          Int      @id @default(autoincrement())
+  name        String
+  contactName String?
+  phone       String?
+  tin         String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+}
+
+// One row only (id = 1). Holds company details, tax setting and the invoice counter.
+model CompanySetting {
+  id                Int      @id @default(1)
+  companyName       String
+  address           String?
+  phone             String?
+  tin               String?
+  taxType           TaxType  @default(VAT)
+  taxRate           Decimal  @default(0.15) @db.Decimal(5, 4) // 0.15 = 15%
+  nextInvoiceNumber Int      @default(1) // locked and incremented inside the sale transaction
+  updatedAt         DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------- stock
+
+// Current quantity of one product in one branch.
+// A row with quantity 0 is created for every product x branch when either is created.
+model BranchStock {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  branchId        Int
+  quantity        Decimal  @default(0) @db.Decimal(12, 2)
+  minQty          Decimal  @default(0) @db.Decimal(12, 2)
+  maxQty          Decimal? @db.Decimal(12, 2)
+  lowStockAlerted Boolean  @default(false) // true after an alert; reset when quantity rises above minQty
+  updatedAt       DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+}
+
+// Every change in stock. The source of truth for history.
+model StockMovement {
+  id             Int          @id @default(autoincrement())
+  productId      Int
+  branchId       Int
+  type           MovementType
+  quantityChange Decimal      @db.Decimal(12, 2) // positive adds, negative removes
+  quantityAfter  Decimal      @db.Decimal(12, 2)
+  referenceType  String? // e.g. SALE, PURCHASE_ORDER, TRANSFER
+  referenceId    Int?
+  reason         String?
+  userId         Int
+  createdAt      DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([productId, branchId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model Adjustment {
+  id             Int              @id @default(autoincrement())
+  branchId       Int
+  productId      Int
+  quantityChange Decimal          @db.Decimal(12, 2)
+  reason         AdjustmentReason
+  note           String?
+  userId         Int
+  createdAt      DateTime         @default(now())
+
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([branchId, createdAt])
+}
+
+// ---------------------------------------------------------------- purchasing
+
+model PurchaseOrder {
+  id           Int      @id @default(autoincrement())
+  poNumber     String   @unique
+  supplierId   Int
+  branchId     Int // receiving branch
+  status       PoStatus @default(PENDING_APPROVAL)
+  note         String?
+  createdById  Int
+  createdAt    DateTime @default(now())
+  approvedById Int?
+  approvedAt   DateTime?
+  rejectedById Int?
+  rejectedAt   DateTime?
+  rejectReason String?
+  updatedAt    DateTime @updatedAt
+
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  createdBy  User     @relation("PoCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?    @relation("PoApprovedBy", fields: [approvedById], references: [id])
+  rejectedBy User?    @relation("PoRejectedBy", fields: [rejectedById], references: [id])
+
+  items PurchaseOrderItem[]
+
+  @@index([branchId, status])
+}
+
+model PurchaseOrderItem {
+  id              Int     @id @default(autoincrement())
+  purchaseOrderId Int
+  productId       Int
+  orderedQty      Decimal @db.Decimal(12, 2)
+  receivedQty     Decimal @default(0) @db.Decimal(12, 2)
+  unitCost        Decimal @db.Decimal(12, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([purchaseOrderId])
+}
+
+// ---------------------------------------------------------------- sales
+
+// Prices include tax. total = sum of line totals.
+// taxAmount = total x rate / (1 + rate); subtotal (net) = total - taxAmount.
+model Sale {
+  id            Int      @id @default(autoincrement())
+  invoiceNumber String   @unique // e.g. INV-000001, one company-wide sequence
+  branchId      Int
+  customerName  String?
+  createdById   Int // the cashier
+  subtotal      Decimal  @db.Decimal(12, 2)
+  taxType       TaxType
+  taxRate       Decimal  @db.Decimal(5, 4)
+  taxAmount     Decimal  @db.Decimal(12, 2)
+  total         Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+
+  branch    Branch @relation(fields: [branchId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  items   SaleItem[]
+  returns SaleReturn[]
+
+  @@index([branchId, createdAt])
+}
+
+model SaleItem {
+  id          Int     @id @default(autoincrement())
+  saleId      Int
+  productId   Int
+  quantity    Decimal @db.Decimal(12, 2)
+  unitPrice   Decimal @db.Decimal(12, 2) // price at the time of sale (tax included)
+  lineTotal   Decimal @db.Decimal(12, 2)
+  returnedQty Decimal @default(0) @db.Decimal(12, 2) // so returns can never exceed quantity sold
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  returnItems SaleReturnItem[]
+
+  @@index([saleId])
+}
+
+model SaleReturn {
+  id            Int          @id @default(autoincrement())
+  saleId        Int
+  branchId      Int
+  reason        String?
+  refundAmount  Decimal      @db.Decimal(12, 2)
+  refundStatus  RefundStatus @default(PENDING_REFUND)
+  createdById   Int
+  createdAt     DateTime     @default(now())
+  refundedById  Int?
+  refundedAt    DateTime?
+
+  sale       Sale   @relation(fields: [saleId], references: [id])
+  branch     Branch @relation(fields: [branchId], references: [id])
+  createdBy  User   @relation("ReturnCreatedBy", fields: [createdById], references: [id])
+  refundedBy User?  @relation("ReturnRefundedBy", fields: [refundedById], references: [id])
+
+  items SaleReturnItem[]
+
+  @@index([branchId, refundStatus])
+}
+
+model SaleReturnItem {
+  id           Int     @id @default(autoincrement())
+  saleReturnId Int
+  saleItemId   Int
+  productId    Int
+  quantity     Decimal @db.Decimal(12, 2)
+  unitPrice    Decimal @db.Decimal(12, 2)
+  lineTotal    Decimal @db.Decimal(12, 2)
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@index([saleReturnId])
+}
+
+// ---------------------------------------------------------------- transfers
+
+// Statuses: REQUESTED -> APPROVED -> SHIPPED -> RECEIVED (or REJECTED).
+// Stock leaves the source when SHIPPED and joins the destination when RECEIVED.
+model Transfer {
+  id            Int            @id @default(autoincrement())
+  fromBranchId  Int // source branch (ships the goods)
+  toBranchId    Int // destination branch (requests the goods)
+  status        TransferStatus @default(REQUESTED)
+  note          String?
+  requestedById Int
+  createdAt     DateTime       @default(now()) // time of the request
+  approvedById  Int?
+  approvedAt    DateTime?
+  rejectedById  Int?
+  rejectedAt    DateTime?
+  rejectReason  String?
+  shippedById   Int?
+  shippedAt     DateTime?
+  receivedById  Int?
+  receivedAt    DateTime?
+
+  fromBranch  Branch @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranch    Branch @relation("TransferTo", fields: [toBranchId], references: [id])
+  requestedBy User   @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?  @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  rejectedBy  User?  @relation("TransferRejectedBy", fields: [rejectedById], references: [id])
+  shippedBy   User?  @relation("TransferShippedBy", fields: [shippedById], references: [id])
+  receivedBy  User?  @relation("TransferReceivedBy", fields: [receivedById], references: [id])
+
+  items TransferItem[]
+
+  @@index([fromBranchId, status])
+  @@index([toBranchId, status])
+}
+
+model TransferItem {
+  id         Int     @id @default(autoincrement())
+  transferId Int
+  productId  Int
+  quantity   Decimal @db.Decimal(12, 2)
+
+  transfer Transfer @relation(fields: [transferId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([transferId])
+}
+
+// ---------------------------------------------------------------- alerts and audit
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  type      NotificationType
+  branchId  Int
+  productId Int
+  quantity  Decimal          @db.Decimal(12, 2) // stock level when the alert was created
+  minQty    Decimal          @db.Decimal(12, 2)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([branchId, isRead])
+}
+
+// Append-only: the application has no endpoint that edits or deletes rows here.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  action     String // plain text so Makda's action names can change without a migration
+  entityType String // USER, PRODUCT, SUPPLIER, BRANCH, PO, SALE, RETURN, ADJUSTMENT, TRANSFER, IMPORT
+  entityId   Int?
+  branchId   Int?
+  oldValue   Json?
+  newValue   Json?
+  createdAt  DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@index([branchId, createdAt])
+}
