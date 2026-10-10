@@ -4,6 +4,7 @@ import AppLayout from './components/layout/AppLayout'
 import Login from './features/auth/Login'
 import Placeholder from './components/Placeholder'
 import { MENU } from './config/menu'
+import DateDemo from './features/dev/DateDemo'
 
 export default function App() {
   return (
@@ -22,6 +23,8 @@ export default function App() {
             }
           />
         ))}
+
+        {import.meta.env.DEV && <Route path="/dev/dates" element={<DateDemo />} />}
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -59,5 +59,25 @@
   "SERVER_ERROR": "A server error occurred. Please try again.",
   "NETWORK_ERROR": "Cannot reach the server.",
   "UNKNOWN": "Something went wrong. Please try again."
+},
+"calendar": {
+  "day": "Day",
+  "month": "Month",
+  "year": "Year",
+  "months": {
+    "1": "Meskerem",
+    "2": "Tikimt",
+    "3": "Hidar",
+    "4": "Tahsas",
+    "5": "Tir",
+    "6": "Yekatit",
+    "7": "Megabit",
+    "8": "Miazia",
+    "9": "Ginbot",
+    "10": "Sene",
+    "11": "Hamle",
+    "12": "Nehase",
+    "13": "Pagume"
+  }
 }
 }

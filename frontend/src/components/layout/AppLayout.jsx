@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
 import LanguageToggle from '../LanguageToggle'
+import { formatNow } from '../../lib/dateFormat'
 
 export default function AppLayout() {
   const { user, logout } = useAuth()
@@ -19,6 +20,7 @@ export default function AppLayout() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b flex items-center justify-end gap-4 px-6">
+          <span className="text-sm text-gray-500 mr-auto">{formatNow(t)}</span>
           <LanguageToggle />
           <span className="text-sm text-gray-600">{user.fullName} · {user.role}</span>
           <button onClick={handleLogout} className="text-sm text-brand hover:underline">
