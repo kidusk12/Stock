@@ -9,8 +9,8 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const { t } = useTranslation()
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
   }
 

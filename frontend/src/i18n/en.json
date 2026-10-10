@@ -27,7 +27,10 @@
     "login": "Log in",
     "logout": "Log out",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "signingIn": "Signing in...",
+    "required": "Enter your username and password.",
+    "devHint": "Mock mode: log in as admin, manager, staff or auditor with any password."
   },
   "common": {
     "save": "Save",

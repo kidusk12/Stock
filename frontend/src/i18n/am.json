@@ -27,7 +27,10 @@
     "login": "ግባ",
     "logout": "ውጣ",
     "username": "የተጠቃሚ ስም",
-    "password": "የይለፍ ቃል"
+    "password": "የይለፍ ቃል",
+    "signingIn": "በመግባት ላይ...",
+    "required": "የተጠቃሚ ስምዎን እና የይለፍ ቃልዎን ያስገቡ።",
+    "devHint": "የሙከራ ሁነታ፡ admin, manager, staff ወይም auditor ብለው በማንኛውም የይለፍ ቃል ይግቡ።"
   },
   "common": {
     "save": "አስቀምጥ",
