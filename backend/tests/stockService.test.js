@@ -2,7 +2,7 @@
 // Runs against the database in backend/.env. Every test creates its own branch, product and
 // stock row (names start with "Test"/"T"), and everything is deleted again at the end.
 require('dotenv').config();
-const prisma = require('../src/utils/prisma');
+const prisma = require('../src/config/db');
 const { applyMovement } = require('../src/services/stockService');
 
 jest.setTimeout(30000);

@@ -24,8 +24,8 @@
 //     stock goes back above the minimum
 
 const { Prisma } = require('@prisma/client');
-const prisma = require('../utils/prisma'); // adjust the path if the shared Prisma client lives elsewhere
-const AppError = require('../utils/AppError'); // AppError(status, code, message)
+const prisma = require('../config/db'); // the one shared Prisma client
+const { AppError } = require('../middleware/errors'); // AppError(status, code, message)
 
 const D = (value) => new Prisma.Decimal(value);
 
