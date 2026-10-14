@@ -16,7 +16,7 @@ router.use('/auth', require('./modules/auth/auth.routes'));
 router.use(authenticate, blockAuditorWrites);
 
 // Each feature registers its routes here when it is merged, for example:
-// router.use('/users', require('./modules/users/users.routes'));          // Kidus
+router.use('/users', require('./modules/users/users.routes'));          // Kidus
 // router.use('/products', require('./modules/products/products.routes')); // Hemen
 
 module.exports = router;
