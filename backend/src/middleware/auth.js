@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { AppError } = require('./errors');
+const prisma = require('../utils/prisma');
+const AppError = require('../utils/AppError');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -7,36 +8,68 @@ if (!JWT_SECRET) {
   console.warn('WARNING: JWT_SECRET is not set in .env');
 }
 
-// Verifies the Bearer token and attaches { userId, role, branchId } to req.user
-const authenticate = (req, res, next) => {
-  const header = req.headers.authorization || '';
-  const [scheme, token] = header.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return next(new AppError(401, 'Missing or invalid Authorization header'));
-  }
-
+// Verifies the Bearer token, then loads the user from the DB
+// so role, branchId and isActive are always fresh.
+const authenticate = async (req, res, next) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const header = req.headers.authorization || '';
+    const [scheme, token] = header.split(' ');
+
+    if (scheme !== 'Bearer' || !token) {
+      throw new AppError(401, 'UNAUTHENTICATED', 'Missing or invalid Authorization header');
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      throw new AppError(401, 'UNAUTHENTICATED', 'Invalid or expired token');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+
+    if (!user) {
+      throw new AppError(401, 'UNAUTHENTICATED', 'Invalid or expired token');
+    }
+    if (!user.isActive) {
+      throw new AppError(403, 'ACCOUNT_DISABLED', 'Account is disabled');
+    }
+
     req.user = {
-      userId: payload.userId,
-      role: payload.role,
-      branchId: payload.branchId,
-      username: payload.username,
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      branchId: user.branchId,
     };
     next();
   } catch (err) {
-    next(new AppError(401, 'Invalid or expired token'));
+    next(err);
   }
 };
 
-// Role gate: requireRole('ADMIN', 'BRANCH_MANAGER')
-const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user) return next(new AppError(401, 'Not authenticated'));
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user) return next(new AppError(401, 'UNAUTHENTICATED', 'Not authenticated'));
   if (!roles.includes(req.user.role)) {
-    return next(new AppError(403, 'Insufficient permissions'));
+    return next(new AppError(403, 'FORBIDDEN', 'Insufficient permissions'));
   }
   next();
 };
 
-module.exports = { authenticate, requireRole };
+// Auditor read-only: reject writes except change-password and logout.
+// Applied per-route after authenticate(), so req.user is always set by then.
+const auditorReadOnly = (req, res, next) => {
+  if (!req.user) return next();
+  if (req.user.role !== 'AUDITOR') return next();
+
+  const method = req.method.toUpperCase();
+  const path = req.originalUrl || req.url;
+  const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const allowed = path.endsWith('/auth/change-password') || path.endsWith('/auth/logout');
+
+  if (isWrite && !allowed) {
+    return next(new AppError(403, 'FORBIDDEN', 'Auditor role is read-only'));
+  }
+  next();
+};
+
+module.exports = { authenticate, authorize, auditorReadOnly };

@@ -1,7 +1,3 @@
-// Single shared Prisma client instance.
-// Every module imports from here — never call `new PrismaClient()` elsewhere.
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
-
-module.exports = prisma;
+// Backwards-compatible re-export.
+// The shared Prisma client now lives at src/utils/prisma.js.
+module.exports = require('../utils/prisma');
