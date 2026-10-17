@@ -16,6 +16,7 @@ const stockRoutes = require('./modules/stock/stock.routes');
 router.use('/stock', stockRoutes);
 router.use('/stock-movements', stockRoutes.movementsRouter);
 
-router.use('/categories', require('./modules/categories/categories.routes'));   // ← NEW
+router.use('/categories', require('./modules/categories/categories.routes'));  
+router.use('/branches',   require('./modules/branches/branches.routes'));
 
 module.exports = router;
