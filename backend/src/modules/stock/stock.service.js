@@ -2,6 +2,9 @@ const { Prisma } = require('@prisma/client');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { assertBranchAccess } = require('../../middleware/auth');
+const { validationError } = require('../../middleware/validate'); // shared builder
+const { parsePagination } = require('../../utils/pagination'); // shared pagination rule
+const { dateRangeFilter } = require('../../utils/dates'); // shared Ethiopia-day parser
 
 const MOVEMENT_TYPES = [
   'OPENING_STOCK',
@@ -13,15 +16,15 @@ const MOVEMENT_TYPES = [
   'TRANSFER_IN',
 ];
 
-const withProduct = { product: { select: { name: true, sku: true, costPrice: true } } };
-
-const validationError = (message, field, issue) =>
-  new AppError(400, 'VALIDATION_ERROR', message, [{ field, issue }]);
+const stockInclude = {
+  branch: { select: { name: true } },
+  product: { select: { name: true, sku: true, costPrice: true, category: { select: { name: true } } } },
+};
 
 function parseIntParam(value, field) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1) {
-    throw validationError(`Invalid ${field}`, field, 'must be a positive whole number');
+    throw validationError(`Invalid ${field}`, field, 'invalid', 'must be a positive whole number');
   }
   return n;
 }
@@ -33,16 +36,7 @@ function parseIdOr404(value, message) {
   return n;
 }
 
-function parsePagination({ page = '1', limit = '20' } = {}) {
-  const p = Number(page);
-  const l = Number(limit);
-  if (!Number.isInteger(p) || p < 1 || !Number.isInteger(l) || l < 1 || l > 100) {
-    throw validationError('Invalid pagination', 'page', 'page must be 1 or more and limit between 1 and 100');
-  }
-  return { page: p, limit: l };
-}
-
-// Scope rule (contract 1.5): Admin and Auditor may read any branch (filter with ?branchId=).
+// Scope rule (contract 1.3): Admin and Auditor may read any branch (filter with ?branchId=).
 // Manager and Staff always get their own branch; asking for another one is 403.
 // Returns a branch id to filter by, or null for "all branches".
 function resolveBranchScope(user, requested) {
@@ -54,47 +48,59 @@ function resolveBranchScope(user, requested) {
   return user.role === 'ADMIN' || user.role === 'AUDITOR' ? null : user.branchId;
 }
 
-// "2026-10-05" means that day in Ethiopia time (UTC+3). Returns the UTC moment the day starts.
-function startOfEthiopiaDay(value, field) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) throw validationError(`Invalid ${field}`, field, 'use the format YYYY-MM-DD');
-  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const utc = new Date(Date.UTC(y, m - 1, d));
-  if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== m - 1 || utc.getUTCDate() !== d) {
-    throw validationError(`Invalid ${field}`, field, 'not a real calendar date');
+// The stock row from the contract (section 6.2).
+// minQuantity 0 means "no minimum set"; maxQuantity is null when not set.
+// Staff do not get costPrice and stockValue (5.4, N7).
+function toStockRow(row, user) {
+  const result = {
+    branchId: row.branchId,
+    branchName: row.branch.name,
+    productId: row.productId,
+    productName: row.product.name,
+    sku: row.product.sku,
+    categoryName: row.product.category ? row.product.category.name : null,
+    quantity: row.quantity.toNumber(),
+    minQuantity: row.minQty.toNumber(),
+    maxQuantity: row.maxQty ? row.maxQty.toNumber() : null,
+  };
+  if (user.role !== 'STAFF') {
+    result.costPrice = row.product.costPrice.toNumber();
+    result.stockValue = row.quantity.times(row.product.costPrice).toDecimalPlaces(2).toNumber();
   }
-  return new Date(utc.getTime() - 3 * 60 * 60 * 1000);
+  return result;
 }
 
-// The stock row from the contract (section 6.2)
-const toStockRow = (row) => ({
-  branchId: row.branchId,
-  productId: row.productId,
-  productName: row.product.name,
-  sku: row.product.sku,
-  quantity: row.quantity.toNumber(),
-  minQuantity: row.minQty.gt(0) ? row.minQty.toNumber() : null, // 0 means "not set"
-  maxQuantity: row.maxQty ? row.maxQty.toNumber() : null,
-  costPrice: row.product.costPrice.toNumber(),
-  stockValue: row.quantity.times(row.product.costPrice).toDecimalPlaces(2).toNumber(),
-});
-
-const nameOrSku = (q) => [
+// ?q matches product name, SKU and barcode
+const searchProduct = (q) => [
   { name: { contains: q, mode: 'insensitive' } },
   { sku: { contains: q, mode: 'insensitive' } },
+  { barcode: { contains: q, mode: 'insensitive' } },
 ];
+
+// Product filters shared by the stock list and the consolidated view.
+// Inactive products are hidden unless ?includeInactive=true.
+function productFilter(query, includeInactive) {
+  const filter = {};
+  if (query.q) filter.OR = searchProduct(query.q);
+  if (query.categoryId !== undefined && query.categoryId !== '') {
+    filter.categoryId = parseIntParam(query.categoryId, 'categoryId');
+  }
+  if (!includeInactive) filter.isActive = true;
+  return filter;
+}
 
 // GET /api/stock
 async function listStock(user, query = {}) {
-  const { page, limit } = parsePagination(query);
+  const { page, limit, skip } = parsePagination(query);
   const branchId = resolveBranchScope(user, query.branchId);
+  const includeInactive = query.includeInactive === 'true';
 
-  const where = {};
+  const where = { product: productFilter(query, includeInactive) };
   if (branchId !== null) where.branchId = branchId;
+  if (!includeInactive) where.branch = { isActive: true };
   if (query.productId !== undefined && query.productId !== '') {
     where.productId = parseIntParam(query.productId, 'productId');
   }
-  if (query.q) where.product = { OR: nameOrSku(query.q) };
   if (query.lowOnly === 'true') {
     // Prisma cannot compare two columns, so the low rows are found with one small SQL query
     const low = await prisma.$queryRaw`
@@ -105,32 +111,36 @@ async function listStock(user, query = {}) {
   const [rows, total] = await Promise.all([
     prisma.branchStock.findMany({
       where,
-      include: withProduct,
+      include: stockInclude,
       orderBy: [{ product: { name: 'asc' } }, { branchId: 'asc' }],
-      skip: (page - 1) * limit,
+      skip,
       take: limit,
     }),
     prisma.branchStock.count({ where }),
   ]);
 
-  return { data: rows.map(toStockRow), page, limit, total };
+  return { data: rows.map((row) => toStockRow(row, user)), page, limit, total };
 }
 
 // GET /api/stock/consolidated   (Admin and Auditor only; the route checks the role)
+// Totals count active branches only (contract 6.2), unless ?includeInactive=true.
 async function consolidated(query = {}) {
-  const { page, limit } = parsePagination(query);
-  const where = query.q ? { OR: nameOrSku(query.q) } : {};
+  const { page, limit, skip } = parsePagination(query);
+  const includeInactive = query.includeInactive === 'true';
+  const where = productFilter(query, includeInactive);
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
-      skip: (page - 1) * limit,
+      skip,
       take: limit,
       select: {
         id: true,
         name: true,
+        sku: true,
         stocks: {
+          where: includeInactive ? undefined : { branch: { isActive: true } },
           orderBy: { branchId: 'asc' },
           select: { branchId: true, quantity: true, branch: { select: { name: true } } },
         },
@@ -142,6 +152,7 @@ async function consolidated(query = {}) {
   const data = products.map((p) => ({
     productId: p.id,
     productName: p.name,
+    sku: p.sku,
     totalQuantity: p.stocks.reduce((sum, s) => sum.plus(s.quantity), new Prisma.Decimal(0)).toNumber(),
     branches: p.stocks.map((s) => ({
       branchId: s.branchId,
@@ -154,8 +165,11 @@ async function consolidated(query = {}) {
 }
 
 // PUT /api/stock/:branchId/:productId/thresholds   (Admin, or Manager for their own branch)
-// Body: { minQuantity, maxQuantity? }. maxQuantity omitted = unchanged, null = cleared.
-// TODO (Kidus): write the change (old and new values) to the audit log once middleware/audit.js exists.
+// Body: { minQuantity, maxQuantity? }. minQuantity 0 = no minimum.
+// maxQuantity omitted = unchanged, null = cleared.
+// Only saves the two numbers. Does not change quantity and does not create a notification;
+// the alert state is handled by the stock service on the next stock change.
+// Not written to the audit log in this version (contract 6.2).
 async function setThresholds(user, branchIdParam, productIdParam, body) {
   const branchId = parseIdOr404(branchIdParam, 'Branch not found');
   const productId = parseIdOr404(productIdParam, 'Product not found');
@@ -179,26 +193,22 @@ async function setThresholds(user, branchIdParam, productIdParam, body) {
     max = body.maxQuantity === null ? null : new Prisma.Decimal(body.maxQuantity);
   }
   if (max !== null && max.lt(min)) {
-    throw validationError('maxQuantity must be at least minQuantity', 'maxQuantity', 'must be at least minQuantity');
+    throw validationError('maxQuantity must be at least minQuantity', 'maxQuantity', 'max', 'must be at least minQuantity');
   }
 
   const data = { minQty: min, maxQty: max };
-  // If the stock is not low any more, re-arm the low-stock alert
-  const quantity = row ? row.quantity : new Prisma.Decimal(0);
-  if (min.lte(0) || quantity.gt(min)) data.lowStockAlerted = false;
-
   const updated = await prisma.branchStock.upsert({
     where: key,
     create: { productId, branchId, ...data },
     update: data,
-    include: withProduct,
+    include: stockInclude,
   });
-  return toStockRow(updated);
+  return toStockRow(updated, user);
 }
 
 // GET /api/stock-movements   (read only, newest first)
 async function listMovements(user, query = {}) {
-  const { page, limit } = parsePagination(query);
+  const { page, limit, skip } = parsePagination(query);
   const branchId = resolveBranchScope(user, query.branchId);
 
   const where = {};
@@ -207,27 +217,24 @@ async function listMovements(user, query = {}) {
     where.productId = parseIntParam(query.productId, 'productId');
   }
   if (query.type) {
-    if (!MOVEMENT_TYPES.includes(query.type)) throw validationError('Invalid type', 'type', 'unknown movement type');
+    if (!MOVEMENT_TYPES.includes(query.type)) {
+      throw validationError('Invalid type', 'type', 'invalid', 'unknown movement type');
+    }
     where.type = query.type;
   }
-  if (query.from || query.to) {
-    where.createdAt = {};
-    if (query.from) where.createdAt.gte = startOfEthiopiaDay(query.from, 'from');
-    if (query.to) {
-      // the whole "to" day counts, so stop at the start of the next Ethiopia day
-      where.createdAt.lt = new Date(startOfEthiopiaDay(query.to, 'to').getTime() + 24 * 60 * 60 * 1000);
-    }
-  }
+  const createdAt = dateRangeFilter(query); // from and to are Ethiopia-time days
+  if (createdAt) where.createdAt = createdAt;
 
   const [rows, total] = await Promise.all([
     prisma.stockMovement.findMany({
       where,
       include: {
         product: { select: { name: true } },
+        branch: { select: { name: true } },
         user: { select: { id: true, fullName: true } },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      skip: (page - 1) * limit,
+      skip,
       take: limit,
     }),
     prisma.stockMovement.count({ where }),
@@ -238,6 +245,7 @@ async function listMovements(user, query = {}) {
     productId: m.productId,
     productName: m.product.name,
     branchId: m.branchId,
+    branchName: m.branch.name,
     type: m.type,
     quantityChange: m.quantityChange.toNumber(),
     quantityAfter: m.quantityAfter.toNumber(),

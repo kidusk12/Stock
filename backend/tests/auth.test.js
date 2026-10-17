@@ -36,7 +36,7 @@ afterAll(async () => {
 test('health check works', async () => {
   const res = await request(app).get('/api/health');
   expect(res.status).toBe(200);
-  expect(res.body.data.status).toBe('ok');
+  expect(res.body.status).toBe('ok');
 });
 
 test('login returns token, expiresAt and user; /me returns the same user', async () => {

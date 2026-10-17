@@ -5,7 +5,7 @@ const router = express.Router();
 
 // --- public (no token needed) ---
 router.get('/health', (req, res) => {
-  res.json({ data: { status: 'ok' } });
+  res.json({ status: 'ok' });
 });
 
 // Auth routes: login is public; me, logout and change-password check the token themselves.
