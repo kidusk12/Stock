@@ -17,6 +17,8 @@ router.use(authenticate, blockAuditorWrites);
 
 // Each feature registers its routes here when it is merged, for example:
 router.use('/users', require('./modules/users/users.routes'));          // Kidus
-// router.use('/products', require('./modules/products/products.routes')); // Hemen
+const stockRoutes = require('./modules/stock/stock.routes');
+router.use('/stock', stockRoutes);
+router.use('/stock-movements', stockRoutes.movementsRouter);
 
 module.exports = router;
