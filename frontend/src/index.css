@@ -1,7 +1,110 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #1f4e79;
-  --color-brand-dark: #163a5a;
-  --font-sans: ui-sans-serif, system-ui, 'Noto Sans Ethiopic', sans-serif;
+  --color-sidebar: #173d4a;
+  --color-sidebar-dark: #12303a;
+  --color-sidebar-hover: #1f4a59;
+  --color-canvas: #dee9ee;
+  --color-card-border: #cfdde3;
+  --color-text-main: #15343f;
+  --color-text-muted: #6d8894;
+  --color-brand-teal: #4f7988;
+  --color-peach-bg: #fbece5;
+  --color-peach-border: #f5d5c6;
+  --color-peach-text: #c66749;
+  --font-sans: 'Nunito Sans', 'Noto Sans Ethiopic', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    color: #15343f;
+    background-color: #dee9ee;
+    font-family: var(--font-sans);
+  }
+}
+
+/* Custom visual utility classes matching screenshot */
+.bg-canvas {
+  background-color: #dee9ee;
+}
+
+.bg-sidebar-teal {
+  background-color: #173d4a;
+}
+
+.text-sidebar-muted {
+  color: #9cb5c0;
+}
+
+.border-theme {
+  border-color: #cfdde3;
+}
+
+.shadow-clean {
+  box-shadow: 0 1px 3px 0 rgba(22, 57, 69, 0.04), 0 1px 2px -1px rgba(22, 57, 69, 0.03);
+}
+
+/* Automatic harmonization for all inner pages to match the exact theme */
+.bg-blue-600 {
+  background-color: #173d4a !important;
+}
+.hover\:bg-blue-700:hover {
+  background-color: #12303a !important;
+}
+.bg-blue-50 {
+  background-color: #eaf1f4 !important;
+}
+.text-blue-600, .text-blue-700 {
+  color: #173d4a !important;
+}
+.focus\:border-blue-500:focus {
+  border-color: #4f7988 !important;
+}
+.border-slate-200 {
+  border-color: #cfdde3 !important;
+}
+.border-slate-300 {
+  border-color: #cadbe2 !important;
+}
+.bg-slate-50 {
+  background-color: #edf3f6 !important;
+}
+.bg-slate-100 {
+  background-color: #e5edf1 !important;
+}
+.text-slate-900 {
+  color: #15343f !important;
+}
+.text-slate-800 {
+  color: #15343f !important;
+}
+.text-slate-700 {
+  color: #274c5a !important;
+}
+.text-slate-600 {
+  color: #4b6b79 !important;
+}
+.text-slate-500 {
+  color: #6d8894 !important;
+}
+
+/* Print styles for invoices and reports */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  aside, header, nav, .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .printable-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
 }
