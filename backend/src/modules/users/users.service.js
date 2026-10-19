@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
+const { validationError } = require('../../middleware/validate'); // shared builder
+const { parsePagination } = require('../../utils/pagination'); // shared pagination rule
 
 const ROLES = ['ADMIN', 'BRANCH_MANAGER', 'STAFF', 'AUDITOR'];
 const BRANCH_ROLES = ['BRANCH_MANAGER', 'STAFF']; // these roles must belong to a branch
@@ -19,9 +21,6 @@ const toUser = (u) => ({
   updatedAt: u.updatedAt,
 });
 
-const validationError = (message, field, issue) =>
-  new AppError(400, 'VALIDATION_ERROR', message, [{ field, issue }]);
-
 // A bad id in the URL is treated like a missing record
 function parseId(value) {
   const id = Number(value);
@@ -29,23 +28,14 @@ function parseId(value) {
   return id;
 }
 
-function parsePagination({ page = '1', limit = '20' } = {}) {
-  const p = Number(page);
-  const l = Number(limit);
-  if (!Number.isInteger(p) || p < 1 || !Number.isInteger(l) || l < 1 || l > 100) {
-    throw validationError('Invalid pagination', 'page', 'page must be 1 or more and limit between 1 and 100');
-  }
-  return { page: p, limit: l };
-}
-
 // Contract: branchId is required for BRANCH_MANAGER and STAFF, and must be null for ADMIN and AUDITOR
 function checkBranchRule(role, branchId) {
   const hasBranch = branchId !== null && branchId !== undefined;
   if (BRANCH_ROLES.includes(role) && !hasBranch) {
-    throw validationError('Branch is required for this role', 'branchId', 'required for BRANCH_MANAGER and STAFF');
+    throw validationError('Branch is required for this role', 'branchId', 'required', 'required for BRANCH_MANAGER and STAFF');
   }
   if (!BRANCH_ROLES.includes(role) && hasBranch) {
-    throw validationError('This role cannot have a branch', 'branchId', 'must be null for ADMIN and AUDITOR');
+    throw validationError('This role cannot have a branch', 'branchId', 'invalid', 'must be null for ADMIN and AUDITOR');
   }
 }
 
@@ -56,17 +46,19 @@ async function assertBranchExists(branchId) {
 
 // GET /api/users
 async function list(query = {}) {
-  const { page, limit } = parsePagination(query);
+  const { page, limit, skip } = parsePagination(query);
 
   const where = {};
   if (query.includeInactive !== 'true') where.isActive = true;
   if (query.role) {
-    if (!ROLES.includes(query.role)) throw validationError('Invalid role', 'role', 'unknown role');
+    if (!ROLES.includes(query.role)) throw validationError('Invalid role', 'role', 'invalid', 'unknown role');
     where.role = query.role;
   }
   if (query.branchId) {
     const branchId = Number(query.branchId);
-    if (!Number.isInteger(branchId)) throw validationError('Invalid branchId', 'branchId', 'must be a number');
+    if (!Number.isInteger(branchId)) {
+      throw validationError('Invalid branchId', 'branchId', 'invalid', 'must be a number');
+    }
     where.branchId = branchId;
   }
   if (query.q) {
@@ -81,7 +73,7 @@ async function list(query = {}) {
       where,
       include: withBranch,
       orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
-      skip: (page - 1) * limit,
+      skip,
       take: limit,
     }),
     prisma.user.count({ where }),
@@ -125,7 +117,7 @@ async function update(idParam, changes, actingUserId) {
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'User not found');
 
   if (changes.isActive === false && id === actingUserId) {
-    throw validationError('You cannot deactivate your own account', 'isActive', 'not allowed on your own account');
+    throw validationError('You cannot deactivate your own account', 'isActive', 'invalid', 'not allowed on your own account');
   }
 
   const role = changes.role !== undefined ? changes.role : existing.role;

@@ -1,5 +1,5 @@
 // Needs the seeded users (npm run seed): admin / Admin123!
-// Follows docs/api-contract.md sections 6.2 and 6.3. Creates its own data and deletes it at the end.
+// Follows docs/api-contract.md v5, sections 1, 6.2 and 6.3. Creates its own data and deletes it at the end.
 require('dotenv').config();
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
@@ -10,8 +10,8 @@ const { applyMovement } = require('../src/services/stockService');
 jest.setTimeout(60000);
 
 const stamp = Date.now();
-const prefix = `Test Stock ${stamp}`; // product names for p1 and p2 start with this
-const listQ = `q=${encodeURIComponent(prefix)}`; // finds only p1 and p2 (never p3 or seeded data)
+const prefix = `Test Stock ${stamp}`; // product names for p1, p2 and p4 start with this
+const listQ = `q=${encodeURIComponent(prefix)}`; // finds only our own products (never p3 or seeded data)
 
 const ids = {};
 const tokens = {};
@@ -25,6 +25,14 @@ const login = (username, password) => request(app).post('/api/auth/login').send(
 // "Ethiopia date" (UTC+3) as YYYY-MM-DD, moved by some hours
 const ethiopiaDate = (offsetHours = 0) =>
   new Date(Date.now() + (3 + offsetHours) * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+// A 400 must be a VALIDATION_ERROR whose first detail has this field and rule (contract 1.4)
+function expectValidation(res, field, rule) {
+  expect(res.status).toBe(400);
+  expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  expect(res.body.error.details[0].field).toBe(field);
+  expect(res.body.error.details[0].rule).toBe(rule);
+}
 
 async function createUser(label, role, branchId) {
   const user = await prisma.user.create({
@@ -44,29 +52,58 @@ async function createUser(label, role, branchId) {
 beforeAll(async () => {
   const a = await prisma.branch.create({ data: { name: `${prefix} Branch A`, code: `TSA${stamp}` } });
   const b = await prisma.branch.create({ data: { name: `${prefix} Branch B`, code: `TSB${stamp}` } });
+  const c = await prisma.branch.create({
+    data: { name: `${prefix} Branch C`, code: `TSC${stamp}`, isActive: false }, // inactive branch
+  });
   ids.branchA = a.id;
   ids.branchB = b.id;
+  ids.branchC = c.id;
+
+  const category = await prisma.category.create({ data: { name: `Test Cat ${stamp}` } });
+  ids.category = category.id;
+  ids.categoryName = category.name;
 
   const p1 = await prisma.product.create({
-    data: { name: `${prefix} P1`, sku: `TS-${stamp}-1`, unit: 'piece', costPrice: 10, sellingPrice: 15 },
+    data: {
+      name: `${prefix} P1`,
+      sku: `TS-${stamp}-1`,
+      unit: 'piece',
+      costPrice: 10,
+      sellingPrice: 15,
+      categoryId: category.id,
+    },
   });
   const p2 = await prisma.product.create({
-    data: { name: `${prefix} P2`, sku: `TS-${stamp}-2`, unit: 'piece', costPrice: 20.5, sellingPrice: 30 },
+    data: {
+      name: `${prefix} P2`,
+      sku: `TS-${stamp}-2`,
+      barcode: `BC-${stamp}`,
+      unit: 'piece',
+      costPrice: 20.5,
+      sellingPrice: 30,
+    },
   });
   const p3 = await prisma.product.create({
     data: { name: `Thr ${stamp}`, sku: `TS-${stamp}-3`, unit: 'piece', costPrice: 5, sellingPrice: 8 },
   });
+  const p4 = await prisma.product.create({
+    data: { name: `${prefix} P4`, sku: `TS-${stamp}-4`, unit: 'piece', costPrice: 1, sellingPrice: 2, isActive: false },
+  });
   ids.p1 = p1.id;
   ids.p2 = p2.id;
   ids.p3 = p3.id;
+  ids.p4 = p4.id;
 
-  // p1 has a minimum of 5 in both branches; the others have none
+  // p1 has a minimum of 5 in A and B; the others have none.
+  // p1 in the inactive branch C and the inactive product p4 are there to check the default hiding.
   await prisma.branchStock.createMany({
     data: [
       { productId: ids.p1, branchId: ids.branchA, minQty: 5 },
       { productId: ids.p1, branchId: ids.branchB, minQty: 5 },
+      { productId: ids.p1, branchId: ids.branchC, quantity: 7 },
       { productId: ids.p2, branchId: ids.branchA },
       { productId: ids.p3, branchId: ids.branchA },
+      { productId: ids.p4, branchId: ids.branchA, quantity: 1 },
     ],
   });
 
@@ -87,13 +124,14 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const productIds = [ids.p1, ids.p2, ids.p3];
+  const productIds = [ids.p1, ids.p2, ids.p3, ids.p4];
   await prisma.notification.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.stockMovement.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.branchStock.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
+  await prisma.category.deleteMany({ where: { id: ids.category } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-  await prisma.branch.deleteMany({ where: { id: { in: [ids.branchA, ids.branchB] } } });
+  await prisma.branch.deleteMany({ where: { id: { in: [ids.branchA, ids.branchB, ids.branchC] } } });
   await prisma.$disconnect();
 });
 
@@ -113,7 +151,7 @@ test('roles: who can use which stock endpoint', async () => {
   expect(auditor.body.error.code).toBe('FORBIDDEN');
 });
 
-test('GET /api/stock returns the contract fields, stockValue, and null for a minimum of 0', async () => {
+test('GET /api/stock returns the contract fields; minQuantity is 0 when not set', async () => {
   const res = await get(tokens.admin, `/api/stock?${listQ}`);
   expect(res.status).toBe(200);
   expect(res.body.total).toBe(3);
@@ -121,9 +159,11 @@ test('GET /api/stock returns the contract fields, stockValue, and null for a min
   const p1a = res.body.data.find((r) => r.productId === ids.p1 && r.branchId === ids.branchA);
   expect(p1a).toEqual({
     branchId: ids.branchA,
+    branchName: `${prefix} Branch A`,
     productId: ids.p1,
     productName: `${prefix} P1`,
     sku: `TS-${stamp}-1`,
+    categoryName: ids.categoryName,
     quantity: 10,
     minQuantity: 5,
     maxQuantity: null,
@@ -132,13 +172,34 @@ test('GET /api/stock returns the contract fields, stockValue, and null for a min
   });
 
   const p2a = res.body.data.find((r) => r.productId === ids.p2);
+  expect(p2a.categoryName).toBeNull();
   expect(p2a.quantity).toBe(4.5);
-  expect(p2a.minQuantity).toBeNull();
+  expect(p2a.minQuantity).toBe(0);
+  expect(p2a.maxQuantity).toBeNull();
   expect(p2a.costPrice).toBe(20.5);
   expect(p2a.stockValue).toBe(92.25);
 });
 
-test('GET /api/stock filters by branch and by product', async () => {
+test('Staff do not get costPrice and stockValue; Manager and Auditor do', async () => {
+  const staff = await get(tokens.staff, `/api/stock?${listQ}`);
+  expect(staff.status).toBe(200);
+  expect(staff.body.data.length).toBeGreaterThan(0);
+  staff.body.data.forEach((row) => {
+    expect(row).not.toHaveProperty('costPrice');
+    expect(row).not.toHaveProperty('stockValue');
+    expect(row.quantity).toBeDefined();
+  });
+
+  for (const label of ['manager', 'auditor']) {
+    const res = await get(tokens[label], `/api/stock?${listQ}`);
+    res.body.data.forEach((row) => {
+      expect(row.costPrice).toBeDefined();
+      expect(row.stockValue).toBeDefined();
+    });
+  }
+});
+
+test('GET /api/stock filters by branch, product, category, and q (name, SKU, barcode)', async () => {
   const byBranch = await get(tokens.admin, `/api/stock?${listQ}&branchId=${ids.branchA}`);
   expect(byBranch.body.total).toBe(2);
   byBranch.body.data.forEach((r) => expect(r.branchId).toBe(ids.branchA));
@@ -146,6 +207,18 @@ test('GET /api/stock filters by branch and by product', async () => {
   const byProduct = await get(tokens.admin, `/api/stock?productId=${ids.p1}`);
   expect(byProduct.body.total).toBe(2);
   byProduct.body.data.forEach((r) => expect(r.productId).toBe(ids.p1));
+
+  const byCategory = await get(tokens.admin, `/api/stock?${listQ}&categoryId=${ids.category}`);
+  expect(byCategory.body.total).toBe(2);
+  byCategory.body.data.forEach((r) => expect(r.productId).toBe(ids.p1));
+
+  const byBarcode = await get(tokens.admin, `/api/stock?q=BC-${stamp}`);
+  expect(byBarcode.body.total).toBe(1);
+  expect(byBarcode.body.data[0].productId).toBe(ids.p2);
+
+  const bySku = await get(tokens.admin, `/api/stock?q=TS-${stamp}-2`);
+  expect(bySku.body.total).toBe(1);
+  expect(bySku.body.data[0].productId).toBe(ids.p2);
 });
 
 test('Manager and Staff only see their own branch; Admin and Auditor see all', async () => {
@@ -164,6 +237,20 @@ test('Manager and Staff only see their own branch; Admin and Auditor see all', a
   expect(auditor.body.total).toBe(3);
 });
 
+test('inactive products and branches are hidden by default and shown with includeInactive', async () => {
+  const hidden = await get(tokens.admin, `/api/stock?${listQ}`);
+  expect(hidden.body.total).toBe(3);
+  hidden.body.data.forEach((r) => {
+    expect(r.branchId).not.toBe(ids.branchC);
+    expect(r.productId).not.toBe(ids.p4);
+  });
+
+  const all = await get(tokens.admin, `/api/stock?${listQ}&includeInactive=true`);
+  expect(all.body.total).toBe(5);
+  expect(all.body.data.some((r) => r.branchId === ids.branchC && r.productId === ids.p1)).toBe(true);
+  expect(all.body.data.some((r) => r.productId === ids.p4)).toBe(true);
+});
+
 test('lowOnly returns only rows with a minimum set and quantity at or below it', async () => {
   const res = await get(tokens.admin, `/api/stock?${listQ}&lowOnly=true`);
   expect(res.status).toBe(200);
@@ -173,7 +260,7 @@ test('lowOnly returns only rows with a minimum set and quantity at or below it',
   expect(res.body.data[0].quantity).toBe(3);
 });
 
-test('pagination works and bad parameters are 400 VALIDATION_ERROR', async () => {
+test('pagination works and bad parameters give VALIDATION_ERROR with the right rule', async () => {
   const first = await get(tokens.admin, `/api/stock?${listQ}&limit=2`);
   expect(first.body.data).toHaveLength(2);
   expect(first.body.total).toBe(3);
@@ -183,37 +270,62 @@ test('pagination works and bad parameters are 400 VALIDATION_ERROR', async () =>
   const second = await get(tokens.admin, `/api/stock?${listQ}&limit=2&page=2`);
   expect(second.body.data).toHaveLength(1);
 
-  for (const bad of ['limit=101', 'page=0', 'branchId=abc', 'productId=abc']) {
-    const res = await get(tokens.admin, `/api/stock?${bad}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  const bad = [
+    ['limit=101', 'limit', 'max'],
+    ['limit=0', 'limit', 'min'],
+    ['limit=1.5', 'limit', 'invalid'],
+    ['page=0', 'page', 'min'],
+    ['page=abc', 'page', 'invalid'],
+    ['branchId=abc', 'branchId', 'invalid'],
+    ['productId=abc', 'productId', 'invalid'],
+    ['categoryId=abc', 'categoryId', 'invalid'],
+  ];
+  for (const [query, field, rule] of bad) {
+    expectValidation(await get(tokens.admin, `/api/stock?${query}`), field, rule);
   }
 });
 
-test('GET /api/stock/consolidated totals each product across branches', async () => {
+test('GET /api/stock/consolidated totals active branches only, with sku and filters', async () => {
   const res = await get(tokens.admin, `/api/stock/consolidated?${listQ}`);
   expect(res.status).toBe(200);
-  expect(res.body.total).toBe(2);
+  expect(res.body.total).toBe(2); // the inactive product p4 is hidden
 
   const [first, second] = res.body.data;
   expect(first.productId).toBe(ids.p1);
   expect(first.productName).toBe(`${prefix} P1`);
-  expect(first.totalQuantity).toBe(13);
+  expect(first.sku).toBe(`TS-${stamp}-1`);
+  expect(first.totalQuantity).toBe(13); // the inactive branch C (7) is not counted
   expect(first.branches).toEqual([
     { branchId: ids.branchA, branchName: `${prefix} Branch A`, quantity: 10 },
     { branchId: ids.branchB, branchName: `${prefix} Branch B`, quantity: 3 },
   ]);
   expect(second.productId).toBe(ids.p2);
   expect(second.totalQuantity).toBe(4.5);
+
+  const all = await get(tokens.admin, `/api/stock/consolidated?${listQ}&includeInactive=true`);
+  expect(all.body.total).toBe(3);
+  expect(all.body.data[0].totalQuantity).toBe(20);
+  expect(all.body.data[0].branches).toHaveLength(3);
+
+  const byCategory = await get(tokens.admin, `/api/stock/consolidated?${listQ}&categoryId=${ids.category}`);
+  expect(byCategory.body.total).toBe(1);
+  expect(byCategory.body.data[0].productId).toBe(ids.p1);
+
+  const byBarcode = await get(tokens.admin, `/api/stock/consolidated?q=BC-${stamp}`);
+  expect(byBarcode.body.total).toBe(1);
+  expect(byBarcode.body.data[0].productId).toBe(ids.p2);
+
+  expectValidation(await get(tokens.admin, '/api/stock/consolidated?limit=101'), 'limit', 'max');
 });
 
-test('PUT thresholds: set, keep max when omitted, clear max with null, 0 means not set', async () => {
+test('PUT thresholds: set, keep max when omitted, clear max with null, 0 clears the minimum', async () => {
   const url = `/api/stock/${ids.branchA}/${ids.p3}/thresholds`;
 
   const set = await put(tokens.admin, url, { minQuantity: 6, maxQuantity: 50 });
   expect(set.status).toBe(200);
   expect(set.body.productId).toBe(ids.p3);
   expect(set.body.branchId).toBe(ids.branchA);
+  expect(set.body.branchName).toBe(`${prefix} Branch A`);
   expect(set.body.quantity).toBe(3);
   expect(set.body.minQuantity).toBe(6);
   expect(set.body.maxQuantity).toBe(50);
@@ -231,37 +343,40 @@ test('PUT thresholds: set, keep max when omitted, clear max with null, 0 means n
 
   const zero = await put(tokens.admin, url, { minQuantity: 0 });
   expect(zero.status).toBe(200);
-  expect(zero.body.minQuantity).toBeNull();
+  expect(zero.body.minQuantity).toBe(0);
 });
 
-test('PUT thresholds resets the low-stock alert only when the stock is no longer low', async () => {
+test('PUT thresholds only saves the two numbers: no quantity change, movement, notification or alert reset', async () => {
   const url = `/api/stock/${ids.branchA}/${ids.p3}/thresholds`;
   const key = { productId_branchId: { productId: ids.p3, branchId: ids.branchA } };
-  const flag = async () => (await prisma.branchStock.findUnique({ where: key })).lowStockAlerted;
+  const where = { productId: ids.p3 };
 
   await prisma.branchStock.update({ where: key, data: { minQty: 5, lowStockAlerted: true } });
+  const movementsBefore = await prisma.stockMovement.count({ where });
+  const notificationsBefore = await prisma.notification.count({ where });
 
-  await put(tokens.admin, url, { minQuantity: 5 }); // quantity 3 is still at or below 5
-  expect(await flag()).toBe(true);
+  const res = await put(tokens.admin, url, { minQuantity: 2 }); // quantity 3 is now above the minimum
+  expect(res.status).toBe(200);
 
-  await put(tokens.admin, url, { minQuantity: 2 }); // quantity 3 is above 2
-  expect(await flag()).toBe(false);
+  const row = await prisma.branchStock.findUnique({ where: key });
+  expect(row.quantity.toNumber()).toBe(3);
+  expect(row.lowStockAlerted).toBe(true); // the stock service handles it on the next stock change
+  expect(await prisma.stockMovement.count({ where })).toBe(movementsBefore);
+  expect(await prisma.notification.count({ where })).toBe(notificationsBefore);
 });
 
-test('PUT thresholds rejects bad input, other branches and unknown records', async () => {
+test('PUT thresholds rejects bad input with the right rule, checks the branch first, and 404s', async () => {
   const url = `/api/stock/${ids.branchA}/${ids.p3}/thresholds`;
 
-  const bad = [
-    { minQuantity: 8, maxQuantity: 5 }, // max below min
-    { minQuantity: -1 },
-    { minQuantity: 1.234 }, // more than 2 decimals
-    {}, // minQuantity missing
-  ];
-  for (const body of bad) {
-    const res = await put(tokens.admin, url, body);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-  }
+  expectValidation(await put(tokens.admin, url, { minQuantity: 8, maxQuantity: 5 }), 'maxQuantity', 'max');
+  expectValidation(await put(tokens.admin, url, { minQuantity: -1 }), 'minQuantity', 'min');
+  expectValidation(await put(tokens.admin, url, { minQuantity: 1.234 }), 'minQuantity', 'invalid');
+  expectValidation(await put(tokens.admin, url, {}), 'minQuantity', 'required');
+
+  // Order of checks (contract 6.0): the branch is checked before the body, so this is 403, not 400
+  const otherBranchBadBody = await put(tokens.manager, `/api/stock/${ids.branchB}/${ids.p1}/thresholds`, {});
+  expect(otherBranchBadBody.status).toBe(403);
+  expect(otherBranchBadBody.body.error.code).toBe('FORBIDDEN');
 
   const otherBranch = await put(tokens.manager, `/api/stock/${ids.branchB}/${ids.p1}/thresholds`, { minQuantity: 1 });
   expect(otherBranch.status).toBe(403);
@@ -284,6 +399,7 @@ test('GET /api/stock-movements returns the contract fields, newest first', async
     productId: ids.p1,
     productName: `${prefix} P1`,
     branchId: ids.branchA,
+    branchName: `${prefix} Branch A`,
     type: 'SALE',
     quantityChange: -2,
     quantityAfter: 10,
@@ -309,11 +425,10 @@ test('movements filters: type, Ethiopia-time dates, and bad values', async () =>
   expect((await get(tokens.admin, `${base}&from=${ethiopiaDate(24)}`)).body.total).toBe(0);
   expect((await get(tokens.admin, `${base}&to=${ethiopiaDate(-24)}`)).body.total).toBe(0);
 
-  for (const bad of ['type=NOPE', 'from=abc', 'to=2026-13-45']) {
-    const res = await get(tokens.admin, `${base}&${bad}`);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-  }
+  expectValidation(await get(tokens.admin, `${base}&type=NOPE`), 'type', 'invalid');
+  expectValidation(await get(tokens.admin, `${base}&from=abc`), 'from', 'invalid');
+  expectValidation(await get(tokens.admin, `${base}&to=2026-13-45`), 'to', 'invalid');
+  expectValidation(await get(tokens.admin, `${base}&limit=101`), 'limit', 'max');
 });
 
 test('movements are limited to the own branch for Manager and Staff', async () => {
