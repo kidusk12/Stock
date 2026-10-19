@@ -1,5 +1,5 @@
-// Needs the seeded users (npm run seed): admin / Admin123!
-// Follows docs/api-contract.md section 3 (responses have no { data } wrapper).
+// Needs the seeded users (npm run seed): admin / Admin123!, and the branch MAIN
+// Follows docs/api-contract.md v5, section 3 (responses have no { data } wrapper).
 require('dotenv').config();
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
@@ -11,13 +11,14 @@ jest.setTimeout(30000);
 const stamp = Date.now();
 const tempUserIds = [];
 
-async function createUser(role) {
+async function createUser(role, branchId = null) {
   const user = await prisma.user.create({
     data: {
       username: `test-auth-${role.toLowerCase()}-${stamp}-${tempUserIds.length}`,
       passwordHash: await bcrypt.hash('Test12345', 10),
       fullName: 'Auth Test',
       role,
+      branchId,
     },
   });
   tempUserIds.push(user.id);
@@ -29,7 +30,10 @@ const login = (username, password = 'Test12345') =>
 const bearer = (token) => ({ Authorization: `Bearer ${token}` });
 
 afterAll(async () => {
-  await prisma.user.deleteMany({ where: { id: { in: tempUserIds } } });
+  // Logout writes audit entries that point at the test users, so delete those first.
+  // Done by name prefix, so leftovers from a failed earlier run are cleaned too.
+  await prisma.auditLog.deleteMany({ where: { user: { username: { startsWith: 'test-auth-' } } } });
+  await prisma.user.deleteMany({ where: { username: { startsWith: 'test-auth-' } } });
   await prisma.$disconnect();
 });
 
@@ -118,6 +122,21 @@ test('logout returns { success: true }', async () => {
   const res = await request(app).post('/api/auth/logout').set(auth);
   expect(res.status).toBe(200);
   expect(res.body).toEqual({ success: true });
+});
+
+test('logout writes a USER_LOGOUT audit entry for the user and their branch', async () => {
+  const main = await prisma.branch.findUnique({ where: { code: 'MAIN' } });
+  const user = await createUser('STAFF', main.id);
+  const auth = bearer((await login(user.username)).body.token);
+
+  const before = await prisma.auditLog.count({ where: { userId: user.id, action: 'USER_LOGOUT' } });
+  expect((await request(app).post('/api/auth/logout').set(auth)).status).toBe(200);
+
+  const entries = await prisma.auditLog.findMany({ where: { userId: user.id, action: 'USER_LOGOUT' } });
+  expect(entries).toHaveLength(before + 1);
+  expect(entries[0].entityType).toBe('USER');
+  expect(entries[0].entityId).toBe(user.id);
+  expect(entries[0].branchId).toBe(main.id);
 });
 
 test('an Auditor can log out and change password, but every other write is 403', async () => {
