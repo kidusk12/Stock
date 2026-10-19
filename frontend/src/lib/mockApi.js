@@ -1,5 +1,6 @@
 import { ApiError } from './apiError'
 import { tokenStore } from './tokenStore'
+import { roundMoney } from './money'
 
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms))
 const fail = (status, code, message) => {
@@ -25,6 +26,14 @@ const PRODUCTS = [
   p(4, 'Pasta 500g', 'PAS-500', '6001004', 'Food', 'pack', 35, 45, 300),
   p(5, 'Laundry Soap', 'SOA-01', '6001005', 'Household', 'piece', 20, 28, 0),
 ]
+
+const BRANCHES = [
+  { id: 1, name: 'Bole Branch', code: 'BOLE', address: 'Bole, Addis Ababa', phone: '+251911000000', isActive: true },
+  { id: 2, name: 'Piassa Branch', code: 'PIASSA', address: 'Piassa, Addis Ababa', phone: '+251911000001', isActive: true },
+]
+
+let lastInvoiceNumber = 44 // the first mock sale gets INV-000045, like the contract example
+const currentUser = () => USERS[(tokenStore.get() || '').replace('mock-', '')]
 
 export async function mockRequest(method, path, { body, params } = {}) {
   await delay()
@@ -62,6 +71,70 @@ export async function mockRequest(method, path, { body, params } = {}) {
     const found = PRODUCTS.find((x) => x.barcode === byBarcode[1])
     if (!found) fail(404, 'PRODUCT_NOT_FOUND', 'No product with this barcode')
     return found
+  }
+
+    if (method === 'GET' && path === '/branches') return BRANCHES
+
+  if (method === 'POST' && path === '/sales') {
+    const me = currentUser()
+    if (!me) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    const items = body?.items
+    if (!body?.branchId || !Array.isArray(items) || items.length === 0) {
+      fail(400, 'VALIDATION_ERROR', 'branchId and at least one item are required')
+    }
+
+    const lines = items.map((item, index) => {
+      const product = PRODUCTS.find((x) => x.id === item.productId)
+      if (!product) fail(404, 'NOT_FOUND', `Product ${item.productId} not found`)
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        fail(400, 'VALIDATION_ERROR', 'Quantity must be at least 1')
+      }
+      if (item.quantity > product.quantity) {
+        throw new ApiError({
+          status: 422,
+          code: 'INSUFFICIENT_STOCK',
+          message: `Not enough stock for product ${product.id}`,
+          details: [{ field: `items[${index}].quantity`, issue: `available ${product.quantity}, requested ${item.quantity}` }],
+        })
+      }
+      return { product, quantity: item.quantity }
+    })
+
+    // Everything checked: now deduct stock (the mock shares one stock level between branches)
+    lines.forEach((line) => {
+      line.product.quantity -= line.quantity
+    })
+
+    // Prices include tax (contract T1): the tax is worked out of the total, nothing is added on top
+    const taxRate = 15
+    const saleItems = lines.map((line, i) => ({
+      id: 400 + i,
+      productId: line.product.id,
+      productName: line.product.name,
+      quantity: line.quantity,
+      unitPrice: line.product.sellingPrice,
+      lineTotal: roundMoney(line.product.sellingPrice * line.quantity),
+    }))
+    const total = roundMoney(saleItems.reduce((sum, i) => sum + i.lineTotal, 0))
+    const taxAmount = roundMoney((total * taxRate) / (100 + taxRate))
+    lastInvoiceNumber += 1
+    const branch = BRANCHES.find((b) => b.id === body.branchId)
+
+    return {
+      id: 300 + lastInvoiceNumber,
+      invoiceNumber: `INV-${String(lastInvoiceNumber).padStart(6, '0')}`,
+      branchId: body.branchId,
+      branchName: branch ? branch.name : '',
+      customerName: body.customerName || null,
+      createdBy: { id: me.id, name: me.fullName },
+      items: saleItems,
+      netAmount: roundMoney(total - taxAmount),
+      taxType: 'VAT',
+      taxRate,
+      taxAmount,
+      total,
+      createdAt: new Date().toISOString(),
+    }
   }
 
   // Lets you test the "session ended" behaviour

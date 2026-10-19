@@ -88,5 +88,36 @@
   "placeholder": "ባርኮድ ስካን ያድርጉ፣ ወይም ጽፈው Enter ይጫኑ",
   "found": "ተገኝቷል፦ {{name}}",
   "notFound": "ባርኮድ {{code}} ያለው ምርት አልተገኘም።"
+},
+"sales": {
+  "title": "አዲስ ሽያጭ",
+  "branch": "ቅርንጫፍ",
+  "selectBranch": "ለመሸጥ ቅርንጫፍ ይምረጡ",
+  "searchPlaceholder": "በስም ወይም በ SKU ይፈልጉ",
+  "noResults": "ምንም ምርት አልተገኘም።",
+  "stock": "ክምችት፦ {{qty}}",
+  "outOfStock": "{{name}} አልቋል።",
+  "maxReached": "{{name}} በክምችት ያለው {{qty}} ብቻ ነው።",
+  "customer": "የደንበኛ ስም (አማራጭ)",
+  "complete": "ሽያጩን አጠናቅ",
+  "processing": "በማስኬድ ላይ...",
+  "clear": "ጋሪውን አጽዳ",
+  "cart": {
+    "title": "ጋሪ",
+    "empty": "እስካሁን ምንም ዕቃ የለም። ባርኮድ ስካን ያድርጉ ወይም ምርት ይፈልጉ።",
+    "total": "ጠቅላላ",
+    "priceIncludesTax": "ዋጋዎች ታክስን ያካትታሉ",
+    "increase": "ብዛት ጨምር",
+    "decrease": "ብዛት ቀንስ",
+    "remove": "ዕቃውን አስወግድ"
+  },
+  "done": {
+    "title": "ሽያጩ ተጠናቅቋል",
+    "invoice": "ደረሰኝ {{number}}",
+    "net": "ከታክስ በፊት",
+    "tax": "{{type}} ({{rate}}%)",
+    "total": "ጠቅላላ",
+    "newSale": "አዲስ ሽያጭ"
+  }
 }
 }
