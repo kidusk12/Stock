@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import EthiopianDatePicker from '../../components/EthiopianDatePicker'
 import { formatNow, useFormatDate } from '../../lib/dateFormat'
 import { useFormatBirr } from '../../lib/money'
+import BarcodeInput from '../../components/BarcodeInput'
+import { lookupProductByBarcode } from '../../lib/productLookup'
 
 // Timestamps as the API sends them (UTC). Expected Ethiopia-time results are in the README of this step.
 const SAMPLES = ['2026-10-09T21:30:00Z', '2026-10-05T09:30:00Z', '2023-09-11T12:00:00Z']
@@ -13,6 +15,7 @@ export default function DateDemo() {
   const [amount, setAmount] = useState('1150')
   const formatDate = useFormatDate()
   const [value, setValue] = useState('')
+  const [scanned, setScanned] = useState([])
 
   return (
     <div className="max-w-xl space-y-6">
@@ -66,6 +69,20 @@ export default function DateDemo() {
             <strong>{formatMoney(amount) || '(empty)'}</strong>
         </span>
     </section>
+    <section>
+  <h2 className="font-medium mb-1">Barcode input (mock barcodes: 6001001 to 6001005)</h2>
+  <BarcodeInput
+    lookup={lookupProductByBarcode}
+    onFound={(p) => setScanned((list) => [p, ...list])}
+  />
+  <ul className="text-sm space-y-1">
+    {scanned.map((p, i) => (
+      <li key={i}>
+        {p.name}: {formatMoney(p.sellingPrice)} (in stock: {p.quantity})
+      </li>
+    ))}
+  </ul>
+</section>
     </div>
   )
 }

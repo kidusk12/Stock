@@ -82,5 +82,11 @@
 },
 "money": {
   "currency": "ብር"
+},
+"barcode": {
+  "label": "ባርኮድ ስካን ያድርጉ",
+  "placeholder": "ባርኮድ ስካን ያድርጉ፣ ወይም ጽፈው Enter ይጫኑ",
+  "found": "ተገኝቷል፦ {{name}}",
+  "notFound": "ባርኮድ {{code}} ያለው ምርት አልተገኘም።"
 }
 }

@@ -82,5 +82,11 @@
 },
 "money": {
   "currency": "ETB"
+},
+"barcode": {
+  "label": "Scan barcode",
+  "placeholder": "Scan a barcode, or type it and press Enter",
+  "found": "Found: {{name}}",
+  "notFound": "No product with barcode {{code}}."
 }
 }
