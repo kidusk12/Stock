@@ -15,7 +15,7 @@ const getById = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const user = await usersService.create(req.body);
+  const user = await usersService.create(req.body, req.user.userId);
   res.status(201).json(user);
 });
 
@@ -25,7 +25,7 @@ const update = asyncHandler(async (req, res) => {
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
-  await usersService.resetPassword(req.params.id, req.body.newPassword);
+  await usersService.resetPassword(req.params.id, req.body.newPassword, req.user.userId);
   res.json({ success: true });
 });
 

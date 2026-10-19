@@ -22,6 +22,7 @@ function cacheUser(user) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readCachedUser)
+  const [selectedBranchId, setSelectedBranchId] = useState(null)
   // true while we ask the server who the saved token belongs to
   const [checking, setChecking] = useState(() => Boolean(tokenStore.get()))
 
@@ -65,9 +66,14 @@ export function AuthProvider({ children }) {
     }
     tokenStore.clear()
     setUser(null)
+    setSelectedBranchId(null)
   }
 
-  return <AuthContext.Provider value={{ user, checking, login, logout }}>{children}</AuthContext.Provider>
+  const changeBranch = (branchId) => {
+    if (user?.role === 'ADMIN' || user?.role === 'AUDITOR') setSelectedBranchId(branchId ? Number(branchId) : null)
+  }
+
+  return <AuthContext.Provider value={{ user, checking, login, logout, selectedBranchId, changeBranch }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

@@ -72,10 +72,30 @@ async function request(method, path, options = {}) {
   }
 }
 
+async function download(path, params = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')).toString()
+  const token = tokenStore.get()
+  let response
+  try {
+    response = await fetch(`${BASE_URL}${path}${query ? `?${query}` : ''}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  } catch {
+    throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'Cannot reach the server' })
+  }
+  if (!response.ok) {
+    let body = null
+    try { body = await response.json() } catch { body = null }
+    const error = parseError(response.status, body)
+    if (SESSION_ENDING_CODES.includes(error.code)) endSession()
+    throw error
+  }
+  return response.blob()
+}
+
 export const api = {
   get: (path, params) => request('GET', path, { params }),
   post: (path, body) => request('POST', path, { body }),
   put: (path, body) => request('PUT', path, { body }),
   patch: (path, body) => request('PATCH', path, { body }),
   delete: (path) => request('DELETE', path),
+  download,
 }

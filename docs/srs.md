@@ -207,7 +207,7 @@ Receiving can be partial. If a supplier delivers 60 of 100 ordered units, staff 
 
 At the counter, staff build a sale by searching for products or scanning their barcodes and entering quantities. They may type a customer name. The system checks each item against the branch's stock and refuses the sale if there is not enough.
 
-The system then calculates the subtotal and the tax. For example, a subtotal of 1,000 birr with VAT at 15% gives 150 birr of VAT and a total of 1,150 birr; if the company uses TOT, the TOT rule is applied instead. When the sale is completed, the sale record, the stock deduction and a unique sequential invoice number are saved together. The printable invoice shows the company name and TIN, the invoice number, the date, the items, the tax and the total, and it can be printed or saved as PDF from the browser.
+The selling price already includes VAT or TOT; tax is not added on top. For a tax-inclusive total, the system extracts tax as `total × rate / (100 + rate)` (for example, a 1,150 birr total at 15% VAT contains 150 birr VAT and 1,000 birr net). The server uses the current product prices and configured percentage rate. When the sale is completed, the sale record, stock deductions, audit entry and unique sequential invoice number are saved together. The printable invoice shows company details, cashier, invoice number, date, items, tax and total.
 
 If a customer brings an item back, staff open the original invoice, choose the items and quantities being returned, and confirm. The system does not allow returning more than was sold (minus anything already returned), puts the items back into stock, and links the return to the invoice.
 
@@ -253,7 +253,7 @@ Users can switch the whole interface between Amharic and English, and the choice
 
 ## 3.13 Dashboard, Reports and CSV Export (Features 12 and 17)
 
-After login, each user sees one dashboard whose widgets depend on their role. Admins see total stock value, a sales summary, a branch comparison, the low-stock count and recent activity. Branch Managers see their branch's stock value and sales, low-stock items, pending approvals and transfers in transit. Staff see today's sales and invoice count, a search or scan box, expected purchase orders, pending transfers and the low-stock list. Auditors see recent audit activity and recent adjustments.
+After login, each user sees one dashboard whose widgets depend on their role. Admins see total stock value, a sales summary, a branch comparison, the low-stock count, pending refunds and recent activity. Branch Managers see their branch's stock value and sales, low-stock items, pending approvals, transfers in transit and pending refunds. Staff see today's sales and invoice count, expected purchase orders and pending transfers; low-stock notifications are not available to Staff. Auditors see recent audit activity and recent adjustments.
 
 There are three reports: stock on hand, sales, and stock movement history. Each can be filtered by date range, branch and product, printed or saved as PDF from the browser, and exported to CSV. The CSV export contains the currently filtered rows and is encoded so that Amharic text opens correctly in Excel.
 
@@ -416,10 +416,10 @@ Priority levels: High = required for the core system and must work in the final 
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-IMP-01 | The Admin and Branch Manager shall upload a CSV file of products. | Medium |
+| FR-IMP-01 | The Admin shall upload a CSV file of products. | Medium |
 | FR-IMP-02 | The system shall validate each row (missing required fields, duplicate SKU or barcode in the file or in the system, invalid numbers) and show a preview with errors highlighted. | Medium |
 | FR-IMP-03 | Valid rows shall be imported only after user confirmation; invalid rows shall be skipped and reported. | Medium |
-| FR-IMP-04 | If the file contains an opening quantity column, the quantities shall be recorded as opening stock movements in the selected branch. | Medium |
+| FR-IMP-04 | If the file contains an opening quantity column, positive quantities shall be recorded as opening stock movements in the selected active branch. | Medium |
 | FR-IMP-05 | The system shall provide a downloadable CSV import template. | Medium |
 
 

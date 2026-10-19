@@ -1,5 +1,6 @@
 const { asyncHandler } = require('../../middleware/errors');
 const authService = require('./auth.service');
+const prisma = require('../../config/db');
 
 // Contract section 3: these responses are returned directly, with no { data } wrapper.
 
@@ -16,6 +17,8 @@ const me = asyncHandler(async (req, res) => {
 // Tokens are stateless, so logout only confirms; the browser deletes the token.
 // TODO (Kidus): write USER_LOGOUT to the audit log once middleware/audit.js exists.
 const logout = asyncHandler(async (req, res) => {
+  await prisma.auditLog.create({ data: { userId: req.user.userId, action: 'USER_LOGOUT', entityType: 'USER',
+    entityId: req.user.userId, branchId: req.user.branchId } });
   res.json({ success: true });
 });
 

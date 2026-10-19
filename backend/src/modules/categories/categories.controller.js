@@ -18,9 +18,9 @@ exports.get = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  res.status(201).json(await svc.createCategory(req.body));
+  res.status(201).json(await svc.createCategory(req.body, req.user.userId));
 });
 
 exports.update = asyncHandler(async (req, res) => {
-  res.json(await svc.updateCategory(parseIdOr404(req.params.id), req.body));
+  res.json(await svc.updateCategory(parseIdOr404(req.params.id), req.body, req.user.userId));
 });

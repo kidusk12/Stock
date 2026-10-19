@@ -14,6 +14,8 @@ const mapBranch = (r) => ({
   address: r.address,
   phone: r.phone,
   isActive: r.isActive,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
 });
 
 function parseIdOr404(id) {
@@ -52,11 +54,13 @@ async function getBranch(id) {
   return mapBranch(row);
 }
 
-async function createBranch(data) {
+async function createBranch(data, actingUserId) {
   try {
     const created = await prisma.$transaction(async (tx) => {
       const branch = await tx.branch.create({ data });
       await createStockRowsForBranch(branch.id, tx);
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'BRANCH_CREATED', entityType: 'BRANCH', entityId: branch.id,
+        branchId: branch.id, newValue: { name: branch.name, code: branch.code } } });
       return branch;
     });
     return mapBranch(created);
@@ -75,11 +79,18 @@ async function createBranch(data) {
   }
 }
 
-async function updateBranch(id, data) {
+async function updateBranch(id, data, actingUserId) {
   parseIdOr404(id);
-  await getBranch(id);
+  const before = await prisma.branch.findUnique({ where: { id } });
+  if (!before) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
   try {
-    const row = await prisma.branch.update({ where: { id }, data });
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.branch.update({ where: { id }, data });
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'BRANCH_UPDATED', entityType: 'BRANCH', entityId: id,
+        branchId: id, oldValue: { name: before.name, code: before.code, address: before.address, phone: before.phone, isActive: before.isActive },
+        newValue: { name: updated.name, code: updated.code, address: updated.address, phone: updated.phone, isActive: updated.isActive } } });
+      return updated;
+    });
     return mapBranch(row);
   } catch (e) {
     if (e.code === 'P2002') {

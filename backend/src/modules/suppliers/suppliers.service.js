@@ -14,6 +14,8 @@ const mapSupplier = (r) => ({
   tin: r.tin,
   address: r.address,
   isActive: r.isActive,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
 });
 
 function parseIdOr404(id) {
@@ -53,15 +55,27 @@ async function getSupplier(id) {
 }
 
 // G3: supplier names are NOT unique in the database — do not catch P2002 on name
-async function createSupplier(data) {
-  const row = await prisma.supplier.create({ data });
+async function createSupplier(data, actingUserId) {
+  const row = await prisma.$transaction(async (tx) => {
+    const supplier = await tx.supplier.create({ data });
+    await tx.auditLog.create({ data: { userId: actingUserId, action: 'SUPPLIER_CREATED', entityType: 'SUPPLIER', entityId: supplier.id,
+      newValue: { name: supplier.name, tin: supplier.tin } } });
+    return supplier;
+  });
   return mapSupplier(row);
 }
 
-async function updateSupplier(id, data) {
+async function updateSupplier(id, data, actingUserId) {
   parseIdOr404(id);
-  await getSupplier(id);
-  const row = await prisma.supplier.update({ where: { id }, data });
+  const before = await prisma.supplier.findUnique({ where: { id } });
+  if (!before) throw new AppError(404, 'NOT_FOUND', 'Supplier not found');
+  const row = await prisma.$transaction(async (tx) => {
+    const updated = await tx.supplier.update({ where: { id }, data });
+    await tx.auditLog.create({ data: { userId: actingUserId, action: 'SUPPLIER_UPDATED', entityType: 'SUPPLIER', entityId: id,
+      oldValue: { name: before.name, contactName: before.contactName, phone: before.phone, tin: before.tin, address: before.address, isActive: before.isActive },
+      newValue: { name: updated.name, contactName: updated.contactName, phone: updated.phone, tin: updated.tin, address: updated.address, isActive: updated.isActive } } });
+    return updated;
+  });
   return mapSupplier(row);
 }
 

@@ -37,7 +37,7 @@ npm install
 npm run dev                 # http://localhost:5173
 ```
 
-The frontend shows a placeholder page. The backend health check is at http://localhost:4000/api/health and should return {"data":{"status":"ok"}}.
+The frontend uses the configured backend API (`VITE_API_URL`) for live stock, sales, purchase, transfer, return, reporting and administration workflows. The health check at http://localhost:4000/api/health returns `{"status":"ok"}`. See [docs/API_CONTRACT.md](docs/API_CONTRACT.md) for API v5 shapes and role rules.
 
 ## Test account (from seed)
 - username: `admin`
@@ -54,8 +54,8 @@ The frontend shows a placeholder page. The backend health check is at http://loc
 ## Project rules
 1. Only `backend/src/services/stockService.js` changes stock quantities.
 2. Permissions are enforced on the server, not just hidden in the UI.
-3. No hard-coded text in the UI. Use translation keys (`t('sales.total')`).
-4. The API contract (`docs/API_CONTRACT.md`) changes only by agreement.
+3. User-facing labels should use translation keys (`t('sales.total')`); feature additions must provide both English and Amharic strings.
+4. API request and response shapes follow v5 in `docs/API_CONTRACT.md` and the team decisions recorded there.
 
 ## Folder guide
 - `backend/src/modules/<feature>/` : each feature has `*.routes.js`, `*.controller.js`, `*.service.js`

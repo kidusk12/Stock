@@ -91,16 +91,20 @@ async function getById(idParam) {
 }
 
 // POST /api/users
-// TODO (Kidus): write USER_CREATED to the audit log once middleware/audit.js exists.
-async function create({ username, fullName, password, role, branchId = null }) {
+async function create({ username, fullName, password, role, branchId = null }, actingUserId) {
   checkBranchRule(role, branchId);
   if (branchId !== null) await assertBranchExists(branchId);
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
-    const user = await prisma.user.create({
-      data: { username, fullName, passwordHash, role, branchId },
-      include: withBranch,
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { username, fullName, passwordHash, role, branchId },
+        include: withBranch,
+      });
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'USER_CREATED', entityType: 'USER',
+        entityId: created.id, branchId, newValue: { username, fullName, role, branchId } } });
+      return created;
     });
     return toUser(user);
   } catch (e) {
@@ -110,7 +114,6 @@ async function create({ username, fullName, password, role, branchId = null }) {
 }
 
 // PATCH /api/users/:id   (any of: fullName, role, branchId, isActive)
-// TODO (Kidus): write USER_UPDATED to the audit log once middleware/audit.js exists.
 async function update(idParam, changes, actingUserId) {
   const id = parseId(idParam);
   const existing = await prisma.user.findUnique({ where: { id } });
@@ -134,18 +137,29 @@ async function update(idParam, changes, actingUserId) {
   }
   if (branchId !== existing.branchId) data.branchId = branchId;
 
-  const user = await prisma.user.update({ where: { id }, data, include: withBranch });
+  const user = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({ where: { id }, data, include: withBranch });
+    await tx.auditLog.create({ data: { userId: actingUserId, action: 'USER_UPDATED', entityType: 'USER',
+      entityId: id, branchId: updated.branchId, oldValue: { fullName: existing.fullName, role: existing.role,
+        branchId: existing.branchId, isActive: existing.isActive },
+      newValue: { fullName: updated.fullName, role: updated.role, branchId: updated.branchId, isActive: updated.isActive } } });
+    return updated;
+  });
   return toUser(user);
 }
 
 // POST /api/users/:id/reset-password
-async function resetPassword(idParam, newPassword) {
+async function resetPassword(idParam, newPassword, actingUserId) {
   const id = parseId(idParam);
   const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'User not found');
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id }, data: { passwordHash } });
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id }, data: { passwordHash } });
+    await tx.auditLog.create({ data: { userId: actingUserId, action: 'USER_UPDATED', entityType: 'USER', entityId: id,
+      newValue: { passwordReset: true } } });
+  });
 }
 
 module.exports = { list, getById, create, update, resetPassword };

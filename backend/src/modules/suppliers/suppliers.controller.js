@@ -17,9 +17,9 @@ exports.get = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  res.status(201).json(await svc.createSupplier(req.body));
+  res.status(201).json(await svc.createSupplier(req.body, req.user.userId));
 });
 
 exports.update = asyncHandler(async (req, res) => {
-  res.json(await svc.updateSupplier(parseIdOr404(req.params.id), req.body));
+  res.json(await svc.updateSupplier(parseIdOr404(req.params.id), req.body, req.user.userId));
 });

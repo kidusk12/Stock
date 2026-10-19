@@ -5,7 +5,7 @@ const { parsePagination } = require('../../utils/pagination');
 const { parseSort } = require('../../utils/sort');
 
 const SORT_FIELDS = ['name', 'id'];
-const mapCategory = (r) => ({ id: r.id, name: r.name, isActive: r.isActive });
+const mapCategory = (r) => ({ id: r.id, name: r.name, isActive: r.isActive, createdAt: r.createdAt, updatedAt: r.updatedAt });
 
 // A bad id in the URL (abc, 0, negative, NaN) is a 404, not a 500.
 function parseIdOr404(id) {
@@ -39,9 +39,14 @@ async function getCategory(id) {
   return mapCategory(row);
 }
 
-async function createCategory(body) {
+async function createCategory(body, actingUserId) {
   try {
-    const row = await prisma.category.create({ data: { name: body.name } });
+    const row = await prisma.$transaction(async (tx) => {
+      const category = await tx.category.create({ data: { name: body.name } });
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'CATEGORY_CREATED', entityType: 'CATEGORY', entityId: category.id,
+        newValue: { name: category.name } } });
+      return category;
+    });
     return mapCategory(row);
   } catch (e) {
     if (e.code === 'P2002') {
@@ -51,11 +56,16 @@ async function createCategory(body) {
   }
 }
 
-async function updateCategory(id, body) {
+async function updateCategory(id, body, actingUserId) {
   parseIdOr404(id);
-  await getCategory(id);
+  const before = await getCategory(id);
   try {
-    const row = await prisma.category.update({ where: { id }, data: body });
+    const row = await prisma.$transaction(async (tx) => {
+      const category = await tx.category.update({ where: { id }, data: body });
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'CATEGORY_UPDATED', entityType: 'CATEGORY', entityId: id,
+        oldValue: { name: before.name, isActive: before.isActive }, newValue: { name: category.name, isActive: category.isActive } } });
+      return category;
+    });
     return mapCategory(row);
   } catch (e) {
     if (e.code === 'P2002') {

@@ -20,5 +20,6 @@ router.use('/categories', require('./modules/categories/categories.routes'));
 router.use('/branches',   require('./modules/branches/branches.routes'));
 router.use('/suppliers',  require('./modules/suppliers/suppliers.routes'));
 router.use('/products',   require('./modules/products/products.routes')); 
+router.use(require('./modules/core/core.routes'));
 
 module.exports = router;

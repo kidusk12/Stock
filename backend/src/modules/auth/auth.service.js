@@ -15,7 +15,10 @@ const toUser = (u) => ({
   branchName: u.branch ? u.branch.name : null,
 });
 
-const validation = (details) => new AppError(400, 'VALIDATION_ERROR', 'Invalid input', details);
+const validation = (details) => new AppError(400, 'VALIDATION_ERROR', 'Invalid input', details.map((item) => ({
+  ...item,
+  rule: item.rule || (item.issue?.toLowerCase().includes('required') ? 'required' : item.field === 'newPassword' ? 'too_short' : 'invalid'),
+})));
 
 // POST /api/auth/login  ->  { token, expiresAt, user }
 async function login({ username, password } = {}) {
@@ -68,7 +71,11 @@ async function changePassword(userId, { currentPassword, newPassword } = {}) {
   if (!ok) throw new AppError(400, 'WRONG_CURRENT_PASSWORD', 'Current password is incorrect');
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+    await tx.auditLog.create({ data: { userId, action: 'USER_UPDATED', entityType: 'USER', entityId: userId,
+      newValue: { passwordChanged: true } } });
+  });
   return { success: true };
 }
 

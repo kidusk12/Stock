@@ -53,6 +53,7 @@ enum TransferStatus {
 }
 
 enum AdjustmentReason {
+  OPENING_STOCK
   DAMAGE
   EXPIRY
   LOSS

@@ -21,6 +21,8 @@ function mapProduct(row, user, quantity) {
     costPrice: row.costPrice.toNumber(),
     sellingPrice: row.sellingPrice.toNumber(),
     isActive: row.isActive,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
   if (user.role === 'STAFF') delete out.costPrice;
   if (quantity !== undefined) out.quantity = Number(quantity);
@@ -29,7 +31,7 @@ function mapProduct(row, user, quantity) {
 
 function parseIdOr404(id) {
   if (!Number.isInteger(id) || id < 1) {
-    throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+    throw new AppError(404, 'NOT_FOUND', 'Product not found');
   }
   return id;
 }
@@ -115,7 +117,7 @@ async function listProducts(req) {
 async function getProduct(req, id) {
   parseIdOr404(id);
   const row = await prisma.product.findUnique({ where: { id }, include: { category: true } });
-  if (!row) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  if (!row) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
   let quantity;
   const branchId = resolveBranchId(req);
@@ -145,9 +147,10 @@ async function getByBarcode(req, barcode) {
   return mapProduct(row, req.user, quantity);
 }
 
-async function createProduct(data) {
+async function createProduct(data, actingUserId) {
   const category = await prisma.category.findUnique({ where: { id: data.categoryId } });
-  if (!category || !category.isActive) {
+  if (!category) throw new AppError(404, 'NOT_FOUND', 'Category not found');
+  if (!category.isActive) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Category must exist and be active', [
       { field: 'categoryId', rule: 'invalid', issue: 'category not found or inactive' },
     ]);
@@ -157,6 +160,8 @@ async function createProduct(data) {
     const created = await prisma.$transaction(async (tx) => {
       const p = await tx.product.create({ data, include: { category: true } });
       await createStockRowsForProduct(p.id, tx);
+      await tx.auditLog.create({ data: { userId: actingUserId, action: 'PRODUCT_CREATED', entityType: 'PRODUCT', entityId: p.id,
+        newValue: { name: p.name, sku: p.sku, barcode: p.barcode, categoryId: p.categoryId, costPrice: p.costPrice.toNumber(), sellingPrice: p.sellingPrice.toNumber() } } });
       return p;
     });
     return mapProduct(created, { role: 'ADMIN' });
@@ -175,14 +180,15 @@ async function createProduct(data) {
   }
 }
 
-async function updateProduct(id, data) {
+async function updateProduct(id, data, actingUserId) {
   parseIdOr404(id);
   const existing = await prisma.product.findUnique({ where: { id } });
-  if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  if (!existing) throw new AppError(404, 'NOT_FOUND', 'Product not found');
 
   if (data.categoryId !== undefined) {
     const category = await prisma.category.findUnique({ where: { id: data.categoryId } });
-    if (!category || !category.isActive) {
+    if (!category) throw new AppError(404, 'NOT_FOUND', 'Category not found');
+    if (!category.isActive) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Category must exist and be active', [
         { field: 'categoryId', rule: 'invalid', issue: 'category not found or inactive' },
       ]);
@@ -190,10 +196,15 @@ async function updateProduct(id, data) {
   }
 
   try {
-    const updated = await prisma.product.update({
-      where: { id },
-      data,
-      include: { category: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.product.update({ where: { id }, data, include: { category: true } });
+      const priceChanged = (data.costPrice !== undefined && !existing.costPrice.equals(data.costPrice)) ||
+        (data.sellingPrice !== undefined && !existing.sellingPrice.equals(data.sellingPrice));
+      await tx.auditLog.create({ data: { userId: actingUserId, action: priceChanged ? 'PRICE_CHANGED' : 'PRODUCT_UPDATED',
+        entityType: 'PRODUCT', entityId: id, oldValue: { name: existing.name, sku: existing.sku,
+          costPrice: existing.costPrice.toNumber(), sellingPrice: existing.sellingPrice.toNumber(), isActive: existing.isActive },
+        newValue: { name: row.name, sku: row.sku, costPrice: row.costPrice.toNumber(), sellingPrice: row.sellingPrice.toNumber(), isActive: row.isActive } } });
+      return row;
     });
     return mapProduct(updated, { role: 'ADMIN' });
   } catch (e) {

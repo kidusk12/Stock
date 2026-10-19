@@ -4,7 +4,7 @@ const { AppError, asyncHandler } = require('../../middleware/errors');
 
 function parseIdOr404(raw) {
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  if (!Number.isInteger(n) || n < 1) throw new AppError(404, 'NOT_FOUND', 'Product not found');
   return n;
 }
 
@@ -21,9 +21,9 @@ exports.getByBarcode = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  res.status(201).json(await svc.createProduct(req.body));
+  res.status(201).json(await svc.createProduct(req.body, req.user.userId));
 });
 
 exports.update = asyncHandler(async (req, res) => {
-  res.json(await svc.updateProduct(parseIdOr404(req.params.id), req.body));
+  res.json(await svc.updateProduct(parseIdOr404(req.params.id), req.body, req.user.userId));
 });
