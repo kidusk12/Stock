@@ -15,7 +15,7 @@ const getById = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const user = await usersService.create(req.body);
+  const user = await usersService.create(req.body, req.user.userId);
   res.status(201).json(user);
 });
 

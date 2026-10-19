@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { validationError } = require('../../middleware/validate'); // shared builder
+const { writeAudit, AUDIT_ACTIONS } = require('../../middleware/audit'); // shared audit writer
 const { parsePagination } = require('../../utils/pagination'); // shared pagination rule
 
 const ROLES = ['ADMIN', 'BRANCH_MANAGER', 'STAFF', 'AUDITOR'];
@@ -19,6 +20,15 @@ const toUser = (u) => ({
   isActive: u.isActive,
   createdAt: u.createdAt,
   updatedAt: u.updatedAt,
+});
+
+// What goes into the audit log about a user. Never the password hash.
+const auditFields = (u) => ({
+  username: u.username,
+  fullName: u.fullName,
+  role: u.role,
+  branchId: u.branchId,
+  isActive: u.isActive,
 });
 
 // A bad id in the URL is treated like a missing record
@@ -91,18 +101,32 @@ async function getById(idParam) {
 }
 
 // POST /api/users
-// TODO (Kidus): write USER_CREATED to the audit log once middleware/audit.js exists.
-async function create({ username, fullName, password, role, branchId = null }) {
+// The user and the USER_CREATED audit entry are saved in one transaction.
+async function create({ username, fullName, password, role, branchId = null }, actingUserId) {
   checkBranchRule(role, branchId);
   if (branchId !== null) await assertBranchExists(branchId);
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
-    const user = await prisma.user.create({
-      data: { username, fullName, passwordHash, role, branchId },
-      include: withBranch,
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { username, fullName, passwordHash, role, branchId },
+        include: withBranch,
+      });
+      await writeAudit(
+        {
+          userId: actingUserId,
+          action: AUDIT_ACTIONS.USER_CREATED,
+          entityType: 'USER',
+          entityId: user.id,
+          branchId: user.branchId,
+          oldValue: null,
+          newValue: auditFields(user),
+        },
+        tx
+      );
+      return toUser(user);
     });
-    return toUser(user);
   } catch (e) {
     if (e.code === 'P2002') throw new AppError(409, 'DUPLICATE_VALUE', 'Username is already taken');
     throw e;
@@ -110,7 +134,8 @@ async function create({ username, fullName, password, role, branchId = null }) {
 }
 
 // PATCH /api/users/:id   (any of: fullName, role, branchId, isActive)
-// TODO (Kidus): write USER_UPDATED to the audit log once middleware/audit.js exists.
+// The change and the USER_UPDATED audit entry are saved in one transaction.
+// The entry holds only the fields that really changed; nothing is logged if nothing changed.
 async function update(idParam, changes, actingUserId) {
   const id = parseId(idParam);
   const existing = await prisma.user.findUnique({ where: { id } });
@@ -134,12 +159,39 @@ async function update(idParam, changes, actingUserId) {
   }
   if (branchId !== existing.branchId) data.branchId = branchId;
 
-  const user = await prisma.user.update({ where: { id }, data, include: withBranch });
-  return toUser(user);
+  // Only the fields whose value really changes go into the audit entry
+  const oldValue = {};
+  const newValue = {};
+  for (const field of Object.keys(data)) {
+    if (data[field] !== existing[field]) {
+      oldValue[field] = existing[field];
+      newValue[field] = data[field];
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.update({ where: { id }, data, include: withBranch });
+    if (Object.keys(newValue).length > 0) {
+      await writeAudit(
+        {
+          userId: actingUserId,
+          action: AUDIT_ACTIONS.USER_UPDATED,
+          entityType: 'USER',
+          entityId: id,
+          branchId: user.branchId,
+          oldValue,
+          newValue,
+        },
+        tx
+      );
+    }
+    return toUser(user);
+  });
 }
 
 // POST /api/users/:id/reset-password
-async function resetPassword(idParam, newPassword) {
+// Not audited: contract 6.8 has no action name for it yet.
+async function resetPassword(idParam, newPassword, actingUserId) {
   const id = parseId(idParam);
   const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'User not found');
