@@ -27,7 +27,10 @@
     "login": "Log in",
     "logout": "Log out",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "signingIn": "Signing in...",
+    "required": "Enter your username and password.",
+    "devHint": "Mock mode: log in as admin, manager, staff or auditor with any password."
   },
   "common": {
     "save": "Save",
@@ -56,5 +59,65 @@
   "SERVER_ERROR": "A server error occurred. Please try again.",
   "NETWORK_ERROR": "Cannot reach the server.",
   "UNKNOWN": "Something went wrong. Please try again."
+ },
+"calendar": {
+  "day": "Day",
+  "month": "Month",
+  "year": "Year",
+  "months": {
+    "1": "Meskerem",
+    "2": "Tikimt",
+    "3": "Hidar",
+    "4": "Tahsas",
+    "5": "Tir",
+    "6": "Yekatit",
+    "7": "Megabit",
+    "8": "Miazia",
+    "9": "Ginbot",
+    "10": "Sene",
+    "11": "Hamle",
+    "12": "Nehase",
+    "13": "Pagume"
+  }
+},
+"money": {
+  "currency": "ETB"
+},
+"barcode": {
+  "label": "Scan barcode",
+  "placeholder": "Scan a barcode, or type it and press Enter",
+  "found": "Found: {{name}}",
+  "notFound": "No product with barcode {{code}}."
+},
+"sales": {
+  "title": "New sale",
+  "branch": "Branch",
+  "selectBranch": "Select a branch to start selling",
+  "searchPlaceholder": "Search by name or SKU",
+  "noResults": "No products found.",
+  "stock": "In stock: {{qty}}",
+  "outOfStock": "{{name}} is out of stock.",
+  "maxReached": "Only {{qty}} of {{name}} in stock.",
+  "customer": "Customer name (optional)",
+  "complete": "Complete sale",
+  "processing": "Processing...",
+  "clear": "Clear cart",
+  "cart": {
+    "title": "Cart",
+    "empty": "No items yet. Scan a barcode or search for a product.",
+    "total": "Total",
+    "priceIncludesTax": "Prices include tax",
+    "increase": "Increase quantity",
+    "decrease": "Decrease quantity",
+    "remove": "Remove item"
+  },
+  "done": {
+    "title": "Sale completed",
+    "invoice": "Invoice {{number}}",
+    "net": "Amount before tax",
+    "tax": "{{type}} ({{rate}}%)",
+    "total": "Total",
+    "newSale": "New sale"
+  }
 }
 }
