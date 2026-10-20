@@ -186,7 +186,10 @@ async function listPurchaseOrders(user, query = {}) {
     const branchId = parseIntParam(query.branchId, 'branchId');
     assertBranchAccess(user, branchId); // Manager and Staff get 403 for another branch
     where.branchId = branchId;
-  } else if (user.role !== 'ADMIN') {
+  } else if (
+    user.role !== 'ADMIN' &&
+    user.role !== 'AUDITOR'
+  ) {
     where.branchId = user.branchId;
   }
   if (query.status) {
