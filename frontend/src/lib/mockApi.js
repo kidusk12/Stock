@@ -329,12 +329,13 @@ function getInitialDb() {
     { id: 5, date: '2026-10-18T09:10:00Z', branchId: 1, branchName: 'Bole Branch', productId: 3, productName: 'Magna Teff 25kg', type: 'SALE', quantityChange: -1, quantityAfter: 8, reason: 'INV-2026-1040', user: 'Dawit Haile' },
   ]
 
-  const auditLogs = [
-    { id: 1, timestamp: '2026-10-18T09:10:00Z', user: 'Dawit Haile', action: 'SALE_COMPLETED', branch: 'Bole Branch', details: 'Completed sale INV-2026-1040 total 4,800.00 ETB' },
-    { id: 2, timestamp: '2026-10-17T15:20:00Z', user: 'Marta Alemu', action: 'STOCK_ADJUSTMENT', branch: 'Bole Branch', details: 'Adjusted B29 Laundry Bar Soap by -6 (DAMAGE)' },
-    { id: 3, timestamp: '2026-10-16T10:30:00Z', user: 'Abebe Kebede', action: 'TRANSFER_SHIPPED', branch: 'Hawassa Warehouse', details: 'Shipped transfer TRF-2026-001 to Bole Branch' },
-    { id: 4, timestamp: '2026-10-15T08:35:00Z', user: 'Marta Alemu', action: 'PO_APPROVED', branch: 'Bole Branch', details: 'Approved purchase order PO-2026-001' },
-    { id: 5, timestamp: '2026-10-14T09:00:00Z', user: 'Abebe Kebede', action: 'PRICE_CHANGED', branch: 'All', details: 'Changed Sugar 50kg selling price to 3,450.00 ETB' },
+    const auditLogs = [
+    { id: 1, createdBy: { id: 3, name: 'Dawit Haile (ዳዊት ኃይሌ)' }, action: 'SALE_CREATED', entityType: 'SALE', entityId: 41, branchId: 1, branchName: 'Bole Branch (ቦሌ ቅርንጫፍ)', oldValue: null, newValue: { invoiceNumber: 'INV-2026-1040', total: 4800 }, createdAt: '2026-10-18T09:10:00Z' },
+    { id: 2, createdBy: { id: 2, name: 'Marta Alemu (ማርታ አለሙ)' }, action: 'ADJUSTMENT_CREATED', entityType: 'ADJUSTMENT', entityId: 3, branchId: 1, branchName: 'Bole Branch (ቦሌ ቅርንጫፍ)', oldValue: { quantity: 10 }, newValue: { quantity: 4, reason: 'DAMAGE' }, createdAt: '2026-10-17T15:20:00Z' },
+    { id: 3, createdBy: { id: 1, name: 'Abebe Kebede (አበበ ከበደ)' }, action: 'TRANSFER_SHIPPED', entityType: 'TRANSFER', entityId: 1, branchId: 3, branchName: 'Hawassa Warehouse (ሐዋሳ መጋዘን)', oldValue: { status: 'APPROVED' }, newValue: { status: 'SHIPPED' }, createdAt: '2026-10-16T10:30:00Z' },
+    { id: 4, createdBy: { id: 2, name: 'Marta Alemu (ማርታ አለሙ)' }, action: 'PO_APPROVED', entityType: 'PO', entityId: 1, branchId: 1, branchName: 'Bole Branch (ቦሌ ቅርንጫፍ)', oldValue: { status: 'PENDING_APPROVAL' }, newValue: { status: 'APPROVED' }, createdAt: '2026-10-15T08:35:00Z' },
+    { id: 5, createdBy: { id: 1, name: 'Abebe Kebede (አበበ ከበደ)' }, action: 'PRICE_CHANGED', entityType: 'PRODUCT', entityId: 1, branchId: null, branchName: null, oldValue: { sellingPrice: 3300 }, newValue: { sellingPrice: 3450 }, createdAt: '2026-10-14T09:00:00Z' },
+    { id: 6, createdBy: { id: 1, name: 'Abebe Kebede (አበበ ከበደ)' }, action: 'USER_UPDATED', entityType: 'USER', entityId: 3, branchId: 1, branchName: 'Bole Branch (ቦሌ ቅርንጫፍ)', oldValue: { isActive: true }, newValue: { isActive: false }, createdAt: '2026-10-13T12:00:00Z' },
   ]
 
   return {
@@ -565,57 +566,65 @@ export async function mockRequest(method, path, { body, params } = {}) {
   }
 
   // ---------------- DASHBOARD ----------------
-  if (method === 'GET' && path === '/dashboard/stats') {
-    const branchId = params?.branchId ? Number(params.branchId) : (currentUser.branchId || null)
-    
-    // Calculate stock value
-    let totalStockVal = 0
-    let lowStockCount = 0
-    db.products.forEach((p) => {
-      const stocks = db.branchStock.filter((s) => s.productId === p.id && (!branchId || s.branchId === branchId))
-      stocks.forEach((s) => {
-        totalStockVal += (s.quantity * p.costPrice)
-        if (s.minQuantity > 0 && s.quantity <= s.minQuantity) {
-          lowStockCount++
-        }
-      })
-    })
+  if (method === 'GET' && path === '/dashboard') {
+    if (!currentUser) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    const role = currentUser.role
+    const branchId = role === 'ADMIN' && params?.branchId
+      ? Number(params.branchId)
+      : ['BRANCH_MANAGER', 'STAFF'].includes(role) ? currentUser.branchId : null
+    const inBranch = (record) => !branchId || Number(record.branchId) === Number(branchId)
+    const ethiopiaNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
+    const dayStartUtc = Date.UTC(ethiopiaNow.getUTCFullYear(), ethiopiaNow.getUTCMonth(), ethiopiaNow.getUTCDate()) - 3 * 60 * 60 * 1000
+    const dayEndUtc = dayStartUtc + 24 * 60 * 60 * 1000
+    const salesToday = db.sales.filter((sale) => inBranch(sale) && new Date(sale.createdAt).getTime() >= dayStartUtc && new Date(sale.createdAt).getTime() < dayEndUtc)
+    const salesSummary = { count: salesToday.length, total: salesToday.reduce((sum, sale) => sum + Number(sale.total || 0), 0) }
+    const stockRows = db.branchStock.filter(inBranch)
+    const stockValue = stockRows.reduce((sum, stock) => {
+      const product = db.products.find((item) => Number(item.id) === Number(stock.productId))
+      return sum + Number(stock.quantity || 0) * Number(product?.costPrice || 0)
+    }, 0)
+    const lowStockItems = stockRows.filter((stock) => Number(stock.minQuantity) > 0 && Number(stock.quantity) <= Number(stock.minQuantity)).map((stock) => ({
+      productId: stock.productId,
+      productName: db.products.find((item) => Number(item.id) === Number(stock.productId))?.name || '',
+      quantity: stock.quantity,
+      minQuantity: stock.minQuantity,
+    }))
+    const pendingRefundRows = db.returns.filter((record) => inBranch(record) && record.refundStatus === 'PENDING_REFUND')
+    const pendingRefunds = { count: pendingRefundRows.length, totalAmount: pendingRefundRows.reduce((sum, record) => sum + Number(record.refundAmount || 0), 0) }
 
-    // Calculate today's sales
-    const todaySales = db.sales
-      .filter((s) => !branchId || s.branchId === branchId)
-      .reduce((sum, s) => sum + s.total, 0)
-
-    // Calculate pending refunds
-    const pendingRefunds = db.returns
-      .filter((r) => r.refundStatus === 'PENDING_REFUND' && (!branchId || r.branchId === branchId))
-      .reduce((sum, r) => sum + r.refundAmount, 0)
-
-    // Transfers in transit
-    const inTransit = db.transfers
-      .filter((t) => t.status === 'SHIPPED' && (!branchId || t.toBranchId === branchId || t.fromBranchId === branchId))
-      .length
-
-    return {
-      totalStockValue: totalStockVal,
-      todaySales,
+    if (role === 'AUDITOR') return { role, widgets: {
+      recentAuditActivity: db.auditLogs.slice(0, 5),
+      recentAdjustments: db.adjustments.slice(0, 5),
+    } }
+    if (role === 'STAFF') return { role, widgets: {
+      salesToday: salesSummary,
+      expectedPurchaseOrders: db.purchaseOrders.filter((po) => inBranch(po) && ['APPROVED', 'PARTIALLY_RECEIVED'].includes(po.status)).slice(0, 5),
+      pendingTransfers: db.transfers.filter((transfer) => (Number(transfer.fromBranchId) === Number(branchId) || Number(transfer.toBranchId) === Number(branchId)) && ['REQUESTED', 'APPROVED', 'SHIPPED'].includes(transfer.status)).slice(0, 5),
+    } }
+    if (role === 'BRANCH_MANAGER') return { role, widgets: {
+      stockValue,
+      salesToday: salesSummary,
+      lowStockItems,
+      pendingApprovals: {
+        purchaseOrders: db.purchaseOrders.filter((po) => inBranch(po) && po.status === 'PENDING_APPROVAL').length,
+        transfers: db.transfers.filter((transfer) => Number(transfer.toBranchId) === Number(branchId) && transfer.status === 'REQUESTED').length,
+      },
+      transfersInTransit: db.transfers.filter((transfer) => Number(transfer.toBranchId) === Number(branchId) && transfer.status === 'SHIPPED').length,
       pendingRefunds,
-      lowStockCount,
-      inTransitCount: inTransit,
-      salesTrend: [
-        { month: 'May (ግንቦት)', sales: 340000 },
-        { month: 'Jun (ሰኔ)', sales: 420000 },
-        { month: 'Jul (ሐምሌ)', sales: 390000 },
-        { month: 'Aug (ነሐሴ)', sales: 510000 },
-        { month: 'Sep (መስከረም)', sales: 640000 },
-        { month: 'Oct (ጥቅምት)', sales: 780000 },
-      ],
-      salesByBranch: [
-        { name: 'Bole Branch', value: 480000, color: '#3b82f6' },
-        { name: 'Merkato Branch', value: 520000, color: '#10b981' },
-        { name: 'Hawassa Warehouse', value: 284560, color: '#f59e0b' },
-      ],
-    }
+    } }
+
+    const branchComparison = db.branches.filter((branch) => !branchId || Number(branch.id) === Number(branchId)).map((branch) => {
+      const branchSales = db.sales.filter((sale) => Number(sale.branchId) === Number(branch.id) && new Date(sale.createdAt).getTime() >= dayStartUtc && new Date(sale.createdAt).getTime() < dayEndUtc)
+      return { branchId: branch.id, branchName: branch.name, total: branchSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0) }
+    })
+    return { role, widgets: {
+      stockValue,
+      salesSummary,
+      branchComparison,
+      lowStockCount: lowStockItems.length,
+      pendingRefunds,
+      recentActivity: db.auditLogs.slice(0, 5),
+    } }
   }
 
   // ---------------- PRODUCTS ----------------
@@ -1702,12 +1711,28 @@ export async function mockRequest(method, path, { body, params } = {}) {
   }
 
   // ---------------- REPORTS ----------------
-  if (method === 'GET' && path === '/reports/stock-balance') {
-    const branchId = params?.branchId ? Number(params.branchId) : (currentUser.branchId || null)
+  const reportDate = (value) => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value))
+    const get = (type) => parts.find((part) => part.type === type)?.value
+    return `${get('year')}-${get('month')}-${get('day')}`
+  }
+  const withinReportDates = (value) => {
+    const day = reportDate(value)
+    return (!params?.from || day >= params.from) && (!params?.to || day <= params.to)
+  }
+  const reportBranchId = () => currentUser.role === 'BRANCH_MANAGER'
+    ? Number(currentUser.branchId)
+    : params?.branchId ? Number(params.branchId) : null
+
+  if (method === 'GET' && ['/reports/stock', '/reports/stock-balance'].includes(path)) {
+    if (!currentUser) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    if (!['ADMIN', 'BRANCH_MANAGER', 'AUDITOR'].includes(currentUser.role)) fail(403, 'FORBIDDEN', 'Reports access is not allowed')
+    const branchId = reportBranchId()
     const rows = []
     let totalValuation = 0
 
     db.products.forEach(p => {
+      if (params?.productId && Number(params.productId) !== Number(p.id)) return
       const stocks = db.branchStock.filter(s => s.productId === p.id && (!branchId || s.branchId === branchId))
       stocks.forEach(s => {
         const br = db.branches.find(b => b.id === s.branchId)
@@ -1728,27 +1753,45 @@ export async function mockRequest(method, path, { body, params } = {}) {
       })
     })
 
-    return { data: rows, totalValuation }
+    return { data: rows, totalValuation, totals: { stockValue: totalValuation }, page: 1, limit: rows.length, total: rows.length }
   }
 
-  if (method === 'GET' && path === '/reports/stock-movement') {
-    const branchId = params?.branchId ? Number(params.branchId) : (currentUser.branchId || null)
-    const filtered = db.movements.filter(m => !branchId || m.branchId === branchId)
-    return { data: filtered }
+  if (method === 'GET' && ['/reports/movements', '/reports/stock-movement'].includes(path)) {
+    if (!currentUser) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    if (!['ADMIN', 'BRANCH_MANAGER', 'AUDITOR'].includes(currentUser.role)) fail(403, 'FORBIDDEN', 'Reports access is not allowed')
+    const branchId = reportBranchId()
+    const filtered = db.movements.filter((movement) =>
+      (!branchId || Number(movement.branchId) === branchId)
+      && (!params?.productId || Number(movement.productId) === Number(params.productId))
+      && withinReportDates(movement.date)
+    )
+    return { data: filtered, totals: {}, page: 1, limit: filtered.length, total: filtered.length }
   }
 
   if (method === 'GET' && path === '/reports/sales') {
-    const branchId = params?.branchId ? Number(params.branchId) : (currentUser.branchId || null)
-    const filtered = db.sales.filter(s => !branchId || s.branchId === branchId)
+    if (!currentUser) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    if (!['ADMIN', 'BRANCH_MANAGER', 'AUDITOR'].includes(currentUser.role)) fail(403, 'FORBIDDEN', 'Reports access is not allowed')
+    const branchId = reportBranchId()
+    const filtered = db.sales.filter((sale) =>
+      (!branchId || Number(sale.branchId) === branchId)
+      && (!params?.productId || (sale.items || []).some((item) => Number(item.productId) === Number(params.productId)))
+      && withinReportDates(sale.createdAt)
+    )
     const summary = filtered.reduce((acc, s) => {
-      acc.totalSales += s.total
-      acc.totalTax += s.tax
-      acc.totalSubtotal += s.subtotal
+      acc.totalSales += Number(s.total) || 0
+      acc.totalTax += Number(s.taxAmount ?? s.tax) || 0
+      acc.totalSubtotal += Number(s.netAmount ?? s.subtotal) || 0
       acc.invoiceCount++
       return acc
     }, { totalSales: 0, totalTax: 0, totalSubtotal: 0, invoiceCount: 0 })
 
-    return { data: filtered, summary }
+    const data = filtered.map((sale) => ({
+      ...sale,
+      cashier: sale.cashier || sale.createdBy?.name || sale.createdByName || sale.user || '—',
+      net: sale.net ?? sale.netAmount ?? sale.subtotal ?? 0,
+      tax: sale.tax ?? sale.taxAmount ?? 0,
+    }))
+    return { data, summary, totals: { totalSales: summary.totalSales, totalTax: summary.totalTax, invoiceCount: summary.invoiceCount }, page: 1, limit: data.length, total: data.length }
   }
 
   // ---------------- REFERENCE DATA ----------------
@@ -1976,8 +2019,98 @@ export async function mockRequest(method, path, { body, params } = {}) {
     return { success: true }
   }
 
-  if (method === 'GET' && path === '/audit-logs') {
-    return { data: db.auditLogs }
+    if (method === 'GET' && path === '/audit-logs') {
+    if (!currentUser) fail(401, 'UNAUTHENTICATED', 'Not logged in')
+    if (!['ADMIN', 'BRANCH_MANAGER', 'AUDITOR'].includes(currentUser.role)) fail(403, 'FORBIDDEN', 'Audit log access is not allowed')
+
+    const page = Number(params?.page) || 1
+    const limit = Number(params?.limit) || 20
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) fail(400, 'VALIDATION_ERROR', 'Invalid pagination')
+
+    // Older mock writers use { timestamp, user, branch, details }. Convert them to the contract 6.8 shape.
+    const base = (s) => String(s ?? '').split(' (')[0]
+    const ACTION_MAP = { SALE_COMPLETED: 'SALE_CREATED', STOCK_ADJUSTMENT: 'ADJUSTMENT_CREATED', USER_ACTIVATED: 'USER_UPDATED', USER_DEACTIVATED: 'USER_UPDATED', USER_PASSWORD_RESET: 'USER_UPDATED' }
+    const ENTITY_BY_PREFIX = { USER: 'USER', PRODUCT: 'PRODUCT', PRICE: 'PRODUCT', SUPPLIER: 'SUPPLIER', BRANCH: 'BRANCH', PO: 'PO', SALE: 'SALE', RETURN: 'RETURN', ADJUSTMENT: 'ADJUSTMENT', TRANSFER: 'TRANSFER', IMPORT: 'IMPORT' }
+    const normalize = (row) => {
+      if (row.createdBy) return row
+      const actor = db.users.find((u) => base(u.fullName) === base(row.user))
+      const branch = db.branches.find((b) => base(b.name) === base(row.branch))
+      const action = ACTION_MAP[row.action] || row.action
+      return {
+        id: row.id,
+        createdBy: { id: actor?.id ?? 0, name: actor?.fullName ?? row.user },
+        action,
+        entityType: ENTITY_BY_PREFIX[String(action).split('_')[0]] ?? null,
+        entityId: null,
+        branchId: branch?.id ?? null,
+        branchName: branch?.name ?? null,
+        oldValue: null,
+        newValue: row.details ? { details: row.details } : null,
+        createdAt: row.timestamp,
+      }
+    }
+
+    const ethiopiaDay = (iso) => {
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(iso))
+      const get = (type) => parts.find((p) => p.type === type)?.value
+      return `${get('year')}-${get('month')}-${get('day')}`
+    }
+
+    const isManager = currentUser.role === 'BRANCH_MANAGER'
+    const branchFilter = isManager ? currentUser.branchId : params?.branchId ? Number(params.branchId) : null
+
+    // A product filter covers events for transactions containing that product,
+    // not only events whose primary entity is the product itself.
+    const matchesProduct = (row, productId) => {
+      if (row.entityType === 'PRODUCT' && Number(row.entityId) === productId) return true
+
+      const details = String(row.newValue?.details ?? '').toLowerCase()
+      const candidates = (records, identifier, reference) => records.filter((record) => {
+        if (row.entityType !== identifier) return false
+        const recordReference = reference?.(record)
+        if (row.entityId !== null && row.entityId !== undefined && Number(record.id) === Number(row.entityId)) return true
+        if (!recordReference) return false
+        const loggedReference = [row.newValue?.invoiceNumber, row.newValue?.poNumber, row.newValue?.returnNumber, row.newValue?.transferNumber]
+          .find((value) => value && String(value).toLowerCase() === String(recordReference).toLowerCase())
+        return Boolean(loggedReference || details.includes(String(recordReference).toLowerCase()))
+      })
+      const saleRecords = candidates(db.sales, 'SALE', (record) => record.invoiceNumber)
+      const purchaseOrders = candidates(db.purchaseOrders, 'PO', (record) => record.poNumber)
+      const returnRecords = candidates(db.returns, 'RETURN', (record) => record.returnNumber)
+      const adjustmentRecords = candidates(db.adjustments, 'ADJUSTMENT')
+      const transferRecords = candidates(db.transfers, 'TRANSFER', (record) => record.transferNumber)
+
+      const linkedProductIds = [
+        ...saleRecords.flatMap((record) => (record.items || []).map((item) => item.productId)),
+        ...purchaseOrders.flatMap((record) => (record.items || []).map((item) => item.productId)),
+        ...returnRecords.flatMap((record) => (record.items || []).map((item) => item.productId)),
+        ...adjustmentRecords.map((record) => record.productId),
+        ...transferRecords.flatMap((record) => (record.items || []).map((item) => item.productId)),
+      ]
+      if (linkedProductIds.some((id) => Number(id) === productId)) return true
+
+      // Older mock audit rows have only a human-readable details string.
+      const product = db.products.find((item) => Number(item.id) === productId)
+      const legacyText = `${row.action || ''} ${details}`.toLowerCase()
+      return Boolean(product && [product.name, product.sku].some((value) => value && legacyText.includes(String(value).toLowerCase())))
+    }
+
+    const filtered = db.auditLogs
+      .map(normalize)
+      .filter((row) => {
+        if (branchFilter && row.branchId !== branchFilter) return false
+        if (params?.userId && row.createdBy.id !== Number(params.userId)) return false
+        if (params?.entityType && row.entityType !== params.entityType) return false
+        if (params?.entityId && Number(row.entityId) !== Number(params.entityId)) return false
+        if (params?.productId && !matchesProduct(row, Number(params.productId))) return false
+        if (params?.action && row.action !== params.action) return false
+        if (params?.from && ethiopiaDay(row.createdAt) < params.from) return false
+        if (params?.to && ethiopiaDay(row.createdAt) > params.to) return false
+        return true
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+    return { data: filtered.slice((page - 1) * limit, page * limit), page, limit, total: filtered.length }
   }
 
   // Contract 6.1 exposes company settings only to Admin, with tax rates as percentages.
