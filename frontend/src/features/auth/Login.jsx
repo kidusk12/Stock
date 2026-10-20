@@ -7,7 +7,6 @@ import { errorKey } from '../../lib/errorMessages'
 import LanguageToggle from '../../components/LanguageToggle'
 import { AlertCircle, ArrowRight, Boxes, Eye, EyeOff, Lock, User } from 'lucide-react'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export default function Login() {
   const { login, user, loading: authLoading } = useAuth()
@@ -99,19 +98,7 @@ export default function Login() {
               </div>
             )}
 
-            {USE_MOCK && (
-              <div className="mt-6 rounded-xl bg-slate-50 border border-slate-100 p-3.5">
-                <p className="text-xs font-semibold text-slate-600 mb-2">{t('auth.testAsRole')}</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {['admin', 'manager', 'staff', 'auditor'].map((role) => (
-                    <button key={role} type="button" disabled={loading} onClick={() => quickLogin(role)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition disabled:opacity-50">
-                      {t(`auth.${role}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
+            
             {errorMsg && (
               <div id="login-error" role="alert" aria-live="assertive" className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700 border border-red-200">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />

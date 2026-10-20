@@ -1,9 +1,8 @@
 import { ApiError } from './apiError'
 import { tokenStore } from './tokenStore'
-import { mockRequest } from './mockApi'
+
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 // Contract 1.4: log the user out ONLY for these two codes.
 const SESSION_ENDING_CODES = ['UNAUTHENTICATED', 'ACCOUNT_DISABLED']
@@ -71,7 +70,7 @@ async function realRequest(method, path, { body, params } = {}) {
 
 async function request(method, path, options = {}) {
   try {
-    return USE_MOCK ? await mockRequest(method, path, options) : await realRequest(method, path, options)
+    return await realRequest(method, path, options)
   } catch (err) {
     if (err instanceof ApiError && SESSION_ENDING_CODES.includes(err.code)) endSession(err.code)
     throw err
@@ -80,10 +79,6 @@ async function request(method, path, options = {}) {
 
 async function downloadRequest(path) {
   try {
-    if (USE_MOCK) {
-      const contents = await mockRequest('GET', path)
-      return new Blob([contents], { type: 'text/csv;charset=utf-8' })
-    }
     const headers = {}
     const token = tokenStore.get()
     if (token) headers.Authorization = `Bearer ${token}`
