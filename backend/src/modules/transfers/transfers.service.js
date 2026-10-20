@@ -152,33 +152,32 @@ async function createTransfer(user, body) {
     return toTransfer(transfer);
   });
 }
-
-// GET /api/transfers   (Admin: all; Manager and Staff: own branch as source or destination; the route blocks the Auditor)
+// GET /api/transfers   (Admin and Auditor: all branches; Manager and Staff: own branch as source or destination)
 // The list leaves out items and adds itemCount.
 async function listTransfers(user, query = {}) {
   const { page, limit, skip } = parsePagination(query);
+  const seesAll = user.role === 'ADMIN' || user.role === 'AUDITOR'; // the Auditor reads everything, read-only
 
-  // The branch the list is about: ?branchId= (Admin; others get 403 for a branch that is not theirs),
-  // otherwise the user's own branch. Admin without ?branchId= sees every branch.
+  // The branch the list is about: ?branchId= (Admin and Auditor any branch; Manager and Staff get 403 for a
+  // branch that is not theirs), otherwise the user's own branch. Admin and Auditor without it see every branch.
   let scopeBranch = null;
   if (query.branchId !== undefined && query.branchId !== '') {
     scopeBranch = parseIntParam(query.branchId, 'branchId');
     assertBranchAccess(user, scopeBranch);
-  } else if (user.role !== 'ADMIN') {
+  } else if (!seesAll) {
     scopeBranch = user.branchId;
   }
 
   const where = {};
-  if (query.direction) {
-    if (!['incoming', 'outgoing'].includes(query.direction)) {
-      throw validationError('Invalid direction', 'direction', 'invalid', 'use incoming or outgoing');
-    }
-    // "Incoming" and "outgoing" are relative to a branch. An Admin has none, so must send ?branchId=.
-    if (scopeBranch === null) {
-      throw validationError('branchId is required with direction', 'branchId', 'required', 'direction is relative to a branch');
-    }
-    if (query.direction === 'incoming') where.toBranchId = scopeBranch;
-    else where.fromBranchId = scopeBranch;
+  if (query.direction && !['incoming', 'outgoing'].includes(query.direction)) {
+    throw validationError('Invalid direction', 'direction', 'invalid', 'use incoming or outgoing');
+  }
+  // "Incoming" and "outgoing" are relative to a branch. Admin and Auditor with only ?direction= (no
+  // ?branchId=) have no branch, so the direction is ignored and every transfer is returned.
+  if (scopeBranch !== null && query.direction === 'incoming') {
+    where.toBranchId = scopeBranch;
+  } else if (scopeBranch !== null && query.direction === 'outgoing') {
+    where.fromBranchId = scopeBranch;
   } else if (scopeBranch !== null) {
     where.OR = [{ fromBranchId: scopeBranch }, { toBranchId: scopeBranch }];
   }
@@ -217,12 +216,15 @@ async function listTransfers(user, query = {}) {
   return { data, page, limit, total };
 }
 
-// GET /api/transfers/:id   (Admin; Manager and Staff only when their branch is the source or destination)
+// GET /api/transfers/:id   (Admin and Auditor: any transfer; Manager and Staff only when their branch is
+// the source or the destination)
 async function getTransfer(user, idParam) {
   const id = parseIdOr404(idParam, 'Transfer not found');
   const transfer = await prisma.transfer.findUnique({ where: { id }, include: transferInclude });
   if (!transfer) throw new AppError(404, 'NOT_FOUND', 'Transfer not found');
-  if (user.role !== 'ADMIN' && user.branchId !== transfer.fromBranchId && user.branchId !== transfer.toBranchId) {
+
+  const seesAll = user.role === 'ADMIN' || user.role === 'AUDITOR';
+  if (!seesAll && user.branchId !== transfer.fromBranchId && user.branchId !== transfer.toBranchId) {
     throw new AppError(403, 'FORBIDDEN', 'You can only access your own branch');
   }
   return toTransfer(transfer);

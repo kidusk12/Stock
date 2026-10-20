@@ -151,16 +151,26 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test('an anonymous user and the Auditor are blocked from every transfer endpoint', async () => {
+test('an anonymous user is blocked; the Auditor reads every transfer but can never write', async () => {
   expect((await request(app).get(T)).status).toBe(401);
 
+  // The Auditor reads the list (all branches) and any single transfer, read-only (N2)
+  const t = (await fromAtoB([line(ids.pList, 1)])).body;
+  const list = await get(tokens.auditor, `${T}?limit=100`);
+  expect(list.status).toBe(200);
+  expect(list.body.total).toBe(await prisma.transfer.count());
+  expect(list.body.data.some((row) => row.id === t.id)).toBe(true);
+  const one = await get(tokens.auditor, `${T}/${t.id}`);
+  expect(one.status).toBe(200);
+  expect(one.body.id).toBe(t.id);
+
+  // Every write is 403 for the Auditor
   const body = { fromBranchId: ids.A, toBranchId: ids.B, items: [line(ids.pList, 1)] };
   expectError(await post(tokens.auditor, T, body), 403, 'FORBIDDEN');
-  expectError(await get(tokens.auditor, T), 403, 'FORBIDDEN');
-  expectError(await get(tokens.auditor, `${T}/1`), 403, 'FORBIDDEN');
   for (const action of ['approve', 'reject', 'ship', 'receive']) {
-    expectError(await act(tokens.auditor, 1, action), 403, 'FORBIDDEN');
+    expectError(await act(tokens.auditor, t.id, action), 403, 'FORBIDDEN');
   }
+  expect((await get(tokens.admin, `${T}/${t.id}`)).body.status).toBe('REQUESTED'); // nothing changed
 });
 
 test('a request returns the contract object, checks no stock, and writes a TRANSFER_REQUESTED audit entry', async () => {
@@ -488,7 +498,16 @@ test('GET /api/transfers: branch scope, itemCount instead of items, newest first
   const inc = await get(tokens.admin, `${T}?branchId=${ids.A}&direction=incoming&limit=100`);
   expect(inc.body.total).toBe(incoming);
   inc.body.data.forEach((row) => expect(row.toBranchId).toBe(ids.A));
-  expectValidation(await get(tokens.admin, `${T}?direction=incoming`), 'branchId', 'required');
+    // Admin or Auditor with only ?direction=: it is ignored and every transfer is returned (no error)
+  const everything = await prisma.transfer.count();
+  for (const label of ['admin', 'auditor']) {
+    const onlyDirection = await get(tokens[label], `${T}?direction=incoming&limit=100`);
+    expect(onlyDirection.status).toBe(200);
+    expect(onlyDirection.body.total).toBe(everything);
+  }
+  // Admin or Auditor with direction and branchId: the direction applies to that branch
+  const auditorOut = await get(tokens.auditor, `${T}?branchId=${ids.A}&direction=outgoing&limit=100`);
+  expect(auditorOut.body.total).toBe(outgoing);
   expectValidation(await get(tokens.admin, `${T}?direction=sideways`), 'direction', 'invalid');
 
   // status, dates, pagination
@@ -521,7 +540,6 @@ test('GET /api/transfers/:id returns the transfer with items; only the two branc
   }
 
   expectError(await get(tokens.managerD, url), 403, 'FORBIDDEN');
-  expectError(await get(tokens.auditor, url), 403, 'FORBIDDEN');
   expectError(await get(tokens.admin, `${T}/999999999`), 404, 'NOT_FOUND');
   expectError(await get(tokens.admin, `${T}/abc`), 404, 'NOT_FOUND');
 });

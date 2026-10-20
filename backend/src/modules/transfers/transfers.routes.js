@@ -38,12 +38,17 @@ const checkDestinationBranch = (req, res, next) => {
 
 const router = express.Router();
 
-// Contract 6.9: Admin, Manager and Staff. The Auditor has no access to transfers (T2).
-router.use(requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF'));
+// Reads (N2): Admin, Manager, Staff and the Auditor. The Auditor reads every transfer, read-only.
+// The service limits Manager and Staff to transfers where their branch is the source or destination.
+const canRead = requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF', 'AUDITOR');
+router.get('/', canRead, controller.list);
+router.get('/:id', canRead, controller.getById);
 
-router.post('/', checkDestinationBranch, validate(createSchema), controller.create);
-router.get('/', controller.list);
-router.get('/:id', controller.getById);
+// Writes: the Auditor never writes. The global blockAuditorWrites rule already answers 403 before this point.
+const canWrite = requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF');
+
+// Request: Admin, Manager and Staff of the DESTINATION branch
+router.post('/', canWrite, checkDestinationBranch, validate(createSchema), controller.create);
 
 // Approve and reject: Admin and Manager of the SOURCE branch. Staff cannot (403).
 router.post('/:id/approve', requireRole('ADMIN', 'BRANCH_MANAGER'), controller.approve);
@@ -51,7 +56,7 @@ router.post('/:id/reject', requireRole('ADMIN', 'BRANCH_MANAGER'), controller.re
 
 // Ship (source branch) and receive (destination branch): Admin, Manager and Staff.
 // The service checks that the user belongs to the right branch for that step.
-router.post('/:id/ship', controller.ship);
-router.post('/:id/receive', controller.receive);
+router.post('/:id/ship', canWrite, controller.ship);
+router.post('/:id/receive', canWrite, controller.receive);
 
 module.exports = router;
