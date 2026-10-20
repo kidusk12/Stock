@@ -21,9 +21,15 @@ function parseError(status, body) {
   })
 }
 
-function endSession() {
+function endSession(code) {
   tokenStore.clear()
-  if (window.location.pathname !== '/login') window.location.assign('/login')
+  try { localStorage.removeItem('sms_user') } catch { /* storage may be unavailable */ }
+  const sessionReason = code === 'ACCOUNT_DISABLED' ? 'disabled' : 'ended'
+  if (window.location.pathname !== '/login') {
+    window.location.assign(`/login?session=${sessionReason}`)
+  } else {
+    window.history.replaceState(null, '', `/login?session=${sessionReason}`)
+  }
 }
 
 async function realRequest(method, path, { body, params } = {}) {
@@ -67,7 +73,29 @@ async function request(method, path, options = {}) {
   try {
     return USE_MOCK ? await mockRequest(method, path, options) : await realRequest(method, path, options)
   } catch (err) {
-    if (err instanceof ApiError && SESSION_ENDING_CODES.includes(err.code)) endSession()
+    if (err instanceof ApiError && SESSION_ENDING_CODES.includes(err.code)) endSession(err.code)
+    throw err
+  }
+}
+
+async function downloadRequest(path) {
+  try {
+    if (USE_MOCK) {
+      const contents = await mockRequest('GET', path)
+      return new Blob([contents], { type: 'text/csv;charset=utf-8' })
+    }
+    const headers = {}
+    const token = tokenStore.get()
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(BASE_URL + path, { headers })
+    if (!res.ok) {
+      let json = null
+      try { json = await res.json() } catch { json = null }
+      throw parseError(res.status, json)
+    }
+    return await res.blob()
+  } catch (err) {
+    if (err instanceof ApiError && SESSION_ENDING_CODES.includes(err.code)) endSession(err.code)
     throw err
   }
 }
@@ -78,4 +106,5 @@ export const api = {
   put: (path, body) => request('PUT', path, { body }),
   patch: (path, body) => request('PATCH', path, { body }),
   delete: (path) => request('DELETE', path),
+  download: (path) => downloadRequest(path),
 }

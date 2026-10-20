@@ -1,73 +1,129 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import { tokenStore, USER_KEY } from '../../lib/tokenStore'
+import { tokenStore } from '../../lib/tokenStore'
 
 const AuthContext = createContext(null)
+const STORAGE_KEY = 'sms_user'
+const BRANCH_KEY = 'sms_selected_branch'
+const BRANCH_ROLES = ['BRANCH_MANAGER', 'STAFF']
 
-function readCachedUser() {
+function readSelectedBranch() {
   try {
-    return tokenStore.get() ? JSON.parse(localStorage.getItem(USER_KEY)) : null
+    const saved = localStorage.getItem(BRANCH_KEY)
+    return saved ? Number(saved) : null
   } catch {
     return null
   }
 }
 
-function cacheUser(user) {
+function storeUser(user) {
   try {
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+    else localStorage.removeItem(STORAGE_KEY)
   } catch {
-    // storage unavailable: ignore
+    // Authentication remains in memory if browser storage is unavailable.
   }
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(readCachedUser)
-  // true while we ask the server who the saved token belongs to
-  const [checking, setChecking] = useState(() => Boolean(tokenStore.get()))
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(Boolean(tokenStore.get()))
+  const [selectedBranchId, setSelectedBranchId] = useState(readSelectedBranch)
 
-  // On page load, refresh the user from the server. Role and branch come from the
-  // database, not from what we saved earlier (contract 1.2).
   useEffect(() => {
-    if (!tokenStore.get()) return
-    let cancelled = false
-    api
-      .get('/auth/me')
-      .then((fresh) => {
-        if (!cancelled) {
-          setUser(fresh)
-          cacheUser(fresh)
-        }
+    let active = true
+    const token = tokenStore.get()
+
+    if (!token) {
+      storeUser(null)
+      setLoading(false)
+      return () => { active = false }
+    }
+
+    api.get('/auth/me')
+      .then((currentUser) => {
+        if (active) setUser(currentUser)
       })
       .catch(() => {
-        // UNAUTHENTICATED / ACCOUNT_DISABLED are handled inside the API client (it logs out).
-        // Any other error (e.g. server down): keep the saved user.
+        tokenStore.clear()
+        storeUser(null)
+        if (active) setUser(null)
       })
       .finally(() => {
-        if (!cancelled) setChecking(false)
+        if (active) setLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
+
+    return () => { active = false }
   }, [])
 
-  // result is the login response: { token, expiresAt, user }
-  const login = ({ token, user: loggedIn }) => {
-    tokenStore.set(token)
-    cacheUser(loggedIn)
-    setUser(loggedIn)
-  }
-
-  const logout = async () => {
-    try {
-      await api.post('/auth/logout') // the server writes USER_LOGOUT to the audit log
-    } catch {
-      // log out locally even if the server call fails
+  useEffect(() => {
+    if (!user) {
+      setSelectedBranchId(null)
+      try { localStorage.removeItem(BRANCH_KEY) } catch { /* storage may be unavailable */ }
+      return
     }
+
+    if (BRANCH_ROLES.includes(user.role)) {
+      const branchId = Number.isInteger(user.branchId) ? user.branchId : null
+      setSelectedBranchId(branchId)
+      try {
+        if (branchId === null) localStorage.removeItem(BRANCH_KEY)
+        else localStorage.setItem(BRANCH_KEY, String(branchId))
+      } catch { /* storage may be unavailable */ }
+    }
+  }, [user])
+
+  const login = useCallback((userData, token) => {
+    if (!userData || !token) throw new Error('Login response must include a user and token')
+    tokenStore.set(token)
+    storeUser(userData)
+    setUser(userData)
+    setLoading(false)
+  }, [])
+
+  const clearSession = useCallback(() => {
     tokenStore.clear()
+    storeUser(null)
     setUser(null)
+    setSelectedBranchId(null)
+    try { localStorage.removeItem(BRANCH_KEY) } catch { /* storage may be unavailable */ }
+  }, [])
+
+  const logout = useCallback(async () => {
+    try {
+      if (tokenStore.get()) await api.post('/auth/logout', {})
+    } finally {
+      clearSession()
+    }
+  }, [clearSession])
+
+  const changeBranch = (branchId) => {
+    if (user?.role !== 'ADMIN' && user?.role !== 'AUDITOR') return
+    const nextBranchId = branchId ? Number(branchId) : null
+    setSelectedBranchId(nextBranchId)
+    try {
+      if (nextBranchId === null) localStorage.removeItem(BRANCH_KEY)
+      else localStorage.setItem(BRANCH_KEY, String(nextBranchId))
+    } catch { /* storage may be unavailable */ }
   }
 
-  return <AuthContext.Provider value={{ user, checking, login, logout }}>{children}</AuthContext.Provider>
+  const updateProfile = (updatedFields) => {
+    setUser((previous) => {
+      if (!previous) return previous
+      const updated = { ...previous, ...updatedFields }
+      storeUser(updated)
+      return updated
+    })
+  }
+
+  return (
+    <AuthContext.Provider value={{
+      user, loading, selectedBranchId, changeBranch, login, logout, updateProfile,
+      clearSession, isAuthenticated: Boolean(user),
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export const useAuth = () => useContext(AuthContext)
