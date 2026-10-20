@@ -21,4 +21,5 @@ router.use('/branches',   require('./modules/branches/branches.routes'));
 router.use('/suppliers',  require('./modules/suppliers/suppliers.routes'));
 router.use('/products',   require('./modules/products/products.routes'));
 router.use('/purchase-orders', require('./modules/purchaseOrders/purchaseOrders.routes'));
+router.use('/transfers', require('./modules/transfers/transfers.routes'));
 module.exports = router;
