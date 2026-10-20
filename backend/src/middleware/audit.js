@@ -1,8 +1,9 @@
 const prisma = require('../config/db');
 
-// ONE list of audit action names (contract 6.8, K4). Callers use AUDIT_ACTIONS.SALE_CREATED,
-// so renaming an action is a one-line change here. PO_REJECTED and TRANSFER_REJECTED are not
-// in the contract yet (K-F); add them here when they are approved.
+// ONE list of audit action names (contract 6.8). Callers use AUDIT_ACTIONS.SALE_CREATED,
+// so renaming an action is a one-line change here.
+// K-F decided: PO_REJECTED and TRANSFER_REJECTED added, STOCK_MOVEMENT dropped
+// (stock movements already have their own history).
 const AUDIT_ACTIONS = Object.freeze({
   USER_CREATED: 'USER_CREATED',
   USER_UPDATED: 'USER_UPDATED',
@@ -12,9 +13,9 @@ const AUDIT_ACTIONS = Object.freeze({
   PRICE_CHANGED: 'PRICE_CHANGED',
   SUPPLIER_UPDATED: 'SUPPLIER_UPDATED',
   BRANCH_UPDATED: 'BRANCH_UPDATED',
-  STOCK_MOVEMENT: 'STOCK_MOVEMENT',
   PO_CREATED: 'PO_CREATED',
   PO_APPROVED: 'PO_APPROVED',
+  PO_REJECTED: 'PO_REJECTED',
   PO_RECEIVED: 'PO_RECEIVED',
   SALE_CREATED: 'SALE_CREATED',
   RETURN_CREATED: 'RETURN_CREATED',
@@ -22,6 +23,7 @@ const AUDIT_ACTIONS = Object.freeze({
   ADJUSTMENT_CREATED: 'ADJUSTMENT_CREATED',
   TRANSFER_REQUESTED: 'TRANSFER_REQUESTED',
   TRANSFER_APPROVED: 'TRANSFER_APPROVED',
+  TRANSFER_REJECTED: 'TRANSFER_REJECTED',
   TRANSFER_SHIPPED: 'TRANSFER_SHIPPED',
   TRANSFER_RECEIVED: 'TRANSFER_RECEIVED',
   IMPORT_CONFIRMED: 'IMPORT_CONFIRMED',

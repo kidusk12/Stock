@@ -114,14 +114,17 @@ test('if the audit write fails, the action before it is rolled back too', async 
   expect(await prisma.branch.findUnique({ where: { code } })).toBeNull();
 });
 
-test('the action and entity type lists contain every name from contract 6.8', () => {
+test('the action and entity type lists have every name from contract 6.8 and the K-F decision', () => {
   const actions = [
     'USER_CREATED', 'USER_UPDATED', 'USER_LOGOUT', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRICE_CHANGED',
-    'SUPPLIER_UPDATED', 'BRANCH_UPDATED', 'STOCK_MOVEMENT', 'PO_CREATED', 'PO_APPROVED', 'PO_RECEIVED',
+    'SUPPLIER_UPDATED', 'BRANCH_UPDATED', 'PO_CREATED', 'PO_APPROVED', 'PO_REJECTED', 'PO_RECEIVED',
     'SALE_CREATED', 'RETURN_CREATED', 'RETURN_REFUNDED', 'ADJUSTMENT_CREATED', 'TRANSFER_REQUESTED',
-    'TRANSFER_APPROVED', 'TRANSFER_SHIPPED', 'TRANSFER_RECEIVED', 'IMPORT_CONFIRMED',
+    'TRANSFER_APPROVED', 'TRANSFER_REJECTED', 'TRANSFER_SHIPPED', 'TRANSFER_RECEIVED', 'IMPORT_CONFIRMED',
   ];
   actions.forEach((name) => expect(AUDIT_ACTIONS[name]).toBe(name));
+
+  // K-F decided: STOCK_MOVEMENT is dropped (stock movements already have their own history)
+  expect(AUDIT_ACTIONS.STOCK_MOVEMENT).toBeUndefined();
 
   const entityTypes = ['USER', 'PRODUCT', 'SUPPLIER', 'BRANCH', 'PO', 'SALE', 'RETURN', 'ADJUSTMENT', 'TRANSFER', 'IMPORT'];
   entityTypes.forEach((name) => expect(AUDIT_ENTITY_TYPES).toContain(name));
