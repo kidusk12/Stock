@@ -1,50 +1,75 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthContext'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { formatDate } from '../../lib/ethiopianDate'
-import {
-  Truck,
-  Plus,
-  ArrowRight,
-  CheckCircle2,
-  PackageCheck,
-  Building2,
-  Clock,
-  Layers,
-  AlertCircle
-} from 'lucide-react'
+import { Truck, Plus, CheckCircle2 } from 'lucide-react'
 
 export default function TransfersList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
-
   const [transfers, setTransfers] = useState([])
   const [branches, setBranches] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [actionLoading, setActionLoading] = useState(null)
+  const [filters, setFilters] = useState({ status: '', direction: '', from: '', to: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ status: '', direction: '', from: '', to: '' })
 
   // Modals
   const [showModal, setShowModal] = useState(false)
   const [fromBranchId, setFromBranchId] = useState('')
   const [toBranchId, setToBranchId] = useState('')
   const [transferItems, setTransferItems] = useState([{ productId: '', quantity: 1 }])
+  const [note, setNote] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [rejectTransfer, setRejectTransfer] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   useEffect(() => {
     loadTransfers()
-    api.get('/branches').then((r) => setBranches(r.data || [])).catch(() => {})
-    api.get('/products').then((r) => setProducts(r.data || [])).catch(() => {})
-  }, [selectedBranchId])
+    api.get('/branches', { limit: 100 }).then((r) => setBranches(Array.isArray(r?.data) ? r.data : [])).catch(() => setBranches([]))
+    api.get('/products', { limit: 100 }).then((r) => setProducts(Array.isArray(r?.data) ? r.data : [])).catch(() => setProducts([]))
+  }, [selectedBranchId, user?.role])
 
-  const loadTransfers = () => {
+  const loadTransfers = (nextPage = 1, activeFilters = appliedFilters) => {
     setLoading(true)
-    api.get('/transfers', { branchId: selectedBranchId })
-      .then((res) => setTransfers(res.data || []))
-      .catch((err) => console.error(err))
+    setLoadError('')
+    api.get('/transfers', {
+      branchId: user?.role === 'ADMIN' ? selectedBranchId : undefined,
+      status: activeFilters.status || undefined,
+      direction: user?.role === 'ADMIN' ? undefined : activeFilters.direction || undefined,
+      from: activeFilters.from || undefined,
+      to: activeFilters.to || undefined,
+      page: nextPage,
+      limit: 20,
+    })
+      .then((res) => {
+        setTransfers(Array.isArray(res?.data) ? res.data : [])
+        setPage(res?.page || nextPage)
+        setTotal(Number(res?.total) || 0)
+      })
+      .catch((err) => setLoadError(t(`errors.${err.code}`, { defaultValue: t('transfers.loadError') })))
       .finally(() => setLoading(false))
+  }
+
+  const handleFilterSubmit = (event) => {
+    event.preventDefault()
+    setAppliedFilters(filters)
+    loadTransfers(1, filters)
+  }
+
+  const clearFilters = () => {
+    const emptyFilters = { status: '', direction: '', from: '', to: '' }
+    setFilters(emptyFilters)
+    setAppliedFilters(emptyFilters)
+    loadTransfers(1, emptyFilters)
   }
 
   const addTransferItem = () => {
@@ -59,18 +84,27 @@ export default function TransfersList() {
     e.preventDefault()
     setErrorMsg('')
 
-    if (!fromBranchId || !toBranchId) {
-      setErrorMsg(isAm ? 'እባክዎ ሁለቱንም ቅርንጫፎች ይምረጡ' : 'Please select both source and destination branches')
+    const destinationId = user?.role === 'ADMIN' ? toBranchId : String(user?.branchId || '')
+    if (!fromBranchId || !destinationId) {
+      setErrorMsg(t('transfers.selectBothBranches'))
       return
     }
-    if (fromBranchId === toBranchId) {
-      setErrorMsg(isAm ? 'አስረካቢ እና ተቀባይ ቅርንጫፎች አንድ መሆን አይችሉም' : 'Source and destination branches must be different')
+    if (fromBranchId === destinationId) {
+      setErrorMsg(t('transfers.differentBranches'))
       return
     }
 
-    const validItems = transferItems.filter((i) => i.productId && Number(i.quantity) > 0)
-    if (validItems.length === 0) {
-      setErrorMsg(isAm ? 'እባክዎ ቢያንስ አንድ ምርት ይምረጡ' : 'Please add at least one product')
+    const validItems = transferItems.filter((item) => item.productId && Number(item.quantity) > 0)
+    if (validItems.length === 0 || validItems.length !== transferItems.length) {
+      setErrorMsg(t('transfers.addValidItem'))
+      return
+    }
+    if (validItems.some((item) => !/^\d+(\.\d{1,2})?$/.test(String(item.quantity)) || Number(item.quantity) <= 0)) {
+      setErrorMsg(t('transfers.invalidQuantity'))
+      return
+    }
+    if (new Set(validItems.map((item) => Number(item.productId))).size !== validItems.length) {
+      setErrorMsg(t('transfers.duplicateProduct'))
       return
     }
 
@@ -78,45 +112,59 @@ export default function TransfersList() {
     try {
       await api.post('/transfers', {
         fromBranchId: Number(fromBranchId),
-        toBranchId: Number(toBranchId),
+        toBranchId: Number(destinationId),
+        ...(note.trim() ? { note: note.trim() } : {}),
         items: validItems.map((i) => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
       })
       setShowModal(false)
       setFromBranchId('')
       setToBranchId('')
       setTransferItems([{ productId: '', quantity: 1 }])
-      loadTransfers()
+      setNote('')
+      const emptyFilters = { status: '', direction: '', from: '', to: '' }
+      setFilters(emptyFilters)
+      setAppliedFilters(emptyFilters)
+      loadTransfers(1, emptyFilters)
     } catch (err) {
-      setErrorMsg(err.message || 'Error creating transfer')
+      setErrorMsg(t(`errors.${err.code}`, { defaultValue: t('transfers.createError') }))
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleApprove = async (id) => {
+  const withAction = async (id, action, request) => {
+    setActionError('')
+    setActionLoading(`${id}:${action}`)
     try {
-      await api.patch(`/transfers/${id}/approve`)
+      await request()
       loadTransfers()
     } catch (err) {
-      alert(err.message || 'Error approving transfer')
+      setActionError(t(`errors.${err.code}`, { defaultValue: t(`transfers.${action}Error`) }))
+    } finally {
+      setActionLoading(null)
     }
   }
 
-  const handleShip = async (id) => {
-    try {
-      await api.post(`/transfers/${id}/ship`)
-      loadTransfers()
-    } catch (err) {
-      alert(err.message || 'Error shipping transfer')
-    }
-  }
+  const handleApprove = (id) => withAction(id, 'approve', () => api.post(`/transfers/${id}/approve`))
 
-  const handleReceive = async (id) => {
+  const handleShip = (id) => withAction(id, 'ship', () => api.post(`/transfers/${id}/ship`))
+
+  const handleReceive = (id) => withAction(id, 'receive', () => api.post(`/transfers/${id}/receive`))
+
+  const handleReject = async (event) => {
+    event.preventDefault()
+    if (!rejectTransfer) return
+    setActionError('')
+    setActionLoading(`${rejectTransfer.id}:reject`)
     try {
-      await api.post(`/transfers/${id}/receive`)
+      await api.post(`/transfers/${rejectTransfer.id}/reject`, { reason: rejectReason.trim() || undefined })
+      setRejectTransfer(null)
+      setRejectReason('')
       loadTransfers()
     } catch (err) {
-      alert(err.message || 'Error receiving transfer')
+      setActionError(t(`errors.${err.code}`, { defaultValue: t('transfers.rejectError') }))
+    } finally {
+      setActionLoading(null)
     }
   }
 
@@ -128,14 +176,12 @@ export default function TransfersList() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {t('transfers.title')}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {isAm ? 'በቅርንጫፎች መካከል የሚደረግ የዕቃ ዝውውር እና የመንገድ ላይ ክትትል' : 'Inter-branch stock transfer workflow and in-transit inventory tracking'}
-          </p>
+          <p className="text-xs text-slate-500 mt-1">{t('transfers.description')}</p>
         </div>
 
         {user?.role !== 'AUDITOR' && (
           <button
-            onClick={() => { setShowModal(true); setErrorMsg(''); }}
+            onClick={() => { setShowModal(true); setErrorMsg(''); setFromBranchId(''); setToBranchId(user?.role === 'ADMIN' ? '' : String(user?.branchId || '')); setNote(''); setTransferItems([{ productId: '', quantity: 1 }]); }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
           >
             <Plus className="h-4 w-4" />
@@ -143,6 +189,16 @@ export default function TransfersList() {
           </button>
         )}
       </div>
+
+      <form onSubmit={handleFilterSubmit} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-bold text-slate-700">{t('transfers.status')}<select value={filters.status} onChange={(event) => setFilters((previous) => ({ ...previous, status: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">{t('transfers.allStatuses')}</option>{['REQUESTED', 'APPROVED', 'REJECTED', 'SHIPPED', 'RECEIVED'].map((status) => <option key={status} value={status}>{t(`status.${status}`, status)}</option>)}</select></label>
+        {user?.role !== 'ADMIN' && <label className="text-xs font-bold text-slate-700">{t('transfers.direction')}<select value={filters.direction} onChange={(event) => setFilters((previous) => ({ ...previous, direction: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">{t('transfers.allDirections')}</option><option value="incoming">{t('transfers.incoming')}</option><option value="outgoing">{t('transfers.outgoing')}</option></select></label>}
+        <label className="text-xs font-bold text-slate-700">{t('sales.from')}<input type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => setFilters((previous) => ({ ...previous, from: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
+        <label className="text-xs font-bold text-slate-700">{t('sales.to')}<input type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => setFilters((previous) => ({ ...previous, to: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
+        <div className="flex gap-2 self-end"><button type="submit" className="flex-1 rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800">{t('sales.applyFilters')}</button><button type="button" onClick={clearFilters} className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">{t('sales.clearFilters')}</button></div>
+      </form>
+
+      {actionError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{actionError}</div>}
 
       {/* Transfers Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-soft overflow-hidden">
@@ -164,24 +220,26 @@ export default function TransfersList() {
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                  <td colSpan={user?.role === 'ADMIN' || user?.role === 'BRANCH_MANAGER' || user?.role === 'STAFF' ? 7 : 6} className="py-8 text-center text-slate-400">
                     {t('common.loading')}
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr><td colSpan={user?.role === 'AUDITOR' ? 6 : 7} className="py-8 text-center text-red-700">{loadError} <button type="button" onClick={() => loadTransfers(page)} className="font-bold underline">{t('common.retry')}</button></td></tr>
               ) : transfers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
-                    {t('common.noData')}
+                  <td colSpan={user?.role === 'AUDITOR' ? 6 : 7} className="py-8 text-center text-slate-400">
+                    {t('transfers.noMatches')}
                   </td>
                 </tr>
               ) : (
                 transfers.map((trf) => (
                   <tr key={trf.id} className="hover:bg-slate-50/70">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-700">{trf.transferNumber}</td>
+                    <td className="py-3 px-4 font-mono font-bold"><Link to={`/transfers/${trf.id}`} className="text-blue-700 hover:underline">{trf.transferNumber}</Link></td>
                     <td className="py-3 px-4 font-semibold text-slate-800">{trf.fromBranchName}</td>
                     <td className="py-3 px-4 font-semibold text-slate-800">{trf.toBranchName}</td>
-                    <td className="py-3 px-4 text-slate-500">{formatDate(trf.createdAt, i18n.language)}</td>
-                    <td className="py-3 px-4 text-center font-bold">{trf.items?.length || 0}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(trf.requestedAt || trf.createdAt, i18n.language)}</td>
+                    <td className="py-3 px-4 text-center font-bold">{trf.itemCount ?? trf.items?.length ?? 0}</td>
                     <td className="py-3 px-4 text-center">
                       <span
                         className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
@@ -189,6 +247,8 @@ export default function TransfersList() {
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
                             : trf.status === 'RECEIVED'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : trf.status === 'REJECTED'
+                            ? 'bg-red-50 text-red-700 border border-red-200'
                             : trf.status === 'APPROVED'
                             ? 'bg-blue-50 text-blue-700 border border-blue-200'
                             : 'bg-slate-100 text-slate-700'
@@ -201,17 +261,23 @@ export default function TransfersList() {
                     {user?.role !== 'AUDITOR' && (
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          {trf.status === 'REQUESTED' && (
+                          {trf.status === 'REQUESTED' && (user?.role === 'ADMIN' || (user?.role === 'BRANCH_MANAGER' && Number(user?.branchId) === Number(trf.fromBranchId))) && (
                             <button
+                              type="button"
+                              disabled={Boolean(actionLoading)}
                               onClick={() => handleApprove(trf.id)}
                               className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-blue-700"
                             >
-                              {t('transfers.approve')}
+                              {actionLoading === `${trf.id}:approve` ? t('common.loading') : t('transfers.approve')}
                             </button>
                           )}
 
-                          {trf.status === 'APPROVED' && (
+                          {trf.status === 'REQUESTED' && (user?.role === 'ADMIN' || (user?.role === 'BRANCH_MANAGER' && Number(user?.branchId) === Number(trf.fromBranchId))) && <button type="button" disabled={Boolean(actionLoading)} onClick={() => { setRejectTransfer(trf); setRejectReason(''); setActionError('') }} className="rounded-lg border border-red-300 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-50">{t('transfers.reject')}</button>}
+
+                          {trf.status === 'APPROVED' && (user?.role === 'ADMIN' || Number(user?.branchId) === Number(trf.fromBranchId)) && (
                             <button
+                              type="button"
+                              disabled={Boolean(actionLoading)}
                               onClick={() => handleShip(trf.id)}
                               className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-700"
                             >
@@ -220,8 +286,10 @@ export default function TransfersList() {
                             </button>
                           )}
 
-                          {trf.status === 'SHIPPED' && (
+                          {trf.status === 'SHIPPED' && (user?.role === 'ADMIN' || Number(user?.branchId) === Number(trf.toBranchId)) && (
                             <button
+                              type="button"
+                              disabled={Boolean(actionLoading)}
                               onClick={() => handleReceive(trf.id)}
                               className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
                             >
@@ -233,7 +301,7 @@ export default function TransfersList() {
                           {trf.status === 'RECEIVED' && (
                             <span className="text-slate-400 text-[11px] font-semibold flex items-center justify-center gap-1">
                               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                              {isAm ? 'ተጠናቋል' : 'Completed'}
+                              {t('transfers.completed')}
                             </span>
                           )}
                         </div>
@@ -245,27 +313,28 @@ export default function TransfersList() {
             </tbody>
           </table>
         </div>
+        {!loading && !loadError && total > 20 && <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-600"><span>{t('transfers.pageSummary', { page, pageCount: Math.ceil(total / 20), total })}</span><div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => loadTransfers(page - 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">{t('common.previous')}</button><button type="button" disabled={page >= Math.ceil(total / 20)} onClick={() => loadTransfers(page + 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">{t('common.next')}</button></div></div>}
       </div>
 
       {/* New Transfer Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl my-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl my-6 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="transfer-form-title">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-extrabold text-base text-slate-900">{t('transfers.newTransfer')}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+              <h3 id="transfer-form-title" className="font-extrabold text-base text-slate-900">{t('transfers.newTransfer')}</h3>
+              <button type="button" onClick={() => setShowModal(false)} aria-label={t('common.close')} className="text-slate-400 hover:text-slate-600 font-bold">
                 ✕
               </button>
             </div>
 
             {errorMsg && (
-              <div className="mt-3 rounded-lg bg-red-50 p-2.5 text-xs font-semibold text-red-700 border border-red-200">
+              <div role="alert" className="mt-3 rounded-lg bg-red-50 p-2.5 text-xs font-semibold text-red-700 border border-red-200">
                 {errorMsg}
               </div>
             )}
 
             <form onSubmit={handleCreateTransfer} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">{t('transfers.fromBranch')} *</label>
                   <select
@@ -274,8 +343,8 @@ export default function TransfersList() {
                     onChange={(e) => setFromBranchId(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
-                    <option value="">{isAm ? 'አስረካቢ ቅርንጫፍ...' : 'Source Branch...'}</option>
-                    {branches.map((b) => (
+                    <option value="">{t('transfers.selectSource')}</option>
+                    {branches.filter((branch) => branch.isActive !== false && (user?.role === 'ADMIN' || branch.id !== Number(user?.branchId))).map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
@@ -283,30 +352,30 @@ export default function TransfersList() {
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">{t('transfers.toBranch')} *</label>
-                  <select
+                  {user?.role === 'ADMIN' ? <select
                     required
                     value={toBranchId}
                     onChange={(e) => setToBranchId(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
-                    <option value="">{isAm ? 'ተቀባይ ቅርንጫፍ...' : 'Destination Branch...'}</option>
-                    {branches.map((b) => (
+                    <option value="">{t('transfers.selectDestination')}</option>
+                    {branches.filter((branch) => branch.isActive !== false).map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
-                  </select>
+                  </select> : <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-700">{branches.find((branch) => branch.id === Number(user?.branchId))?.name || user?.branchName || t('transfers.yourBranch')}</p>}
                 </div>
               </div>
 
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold text-slate-800">{isAm ? 'የሚዘዋወሩ ምርቶች' : 'Items to Transfer'}</span>
+                  <span className="font-bold text-slate-800">{t('transfers.itemsToTransfer')}</span>
                   <button
                     type="button"
                     onClick={addTransferItem}
                     className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
                   >
-                    <Plus className="h-3 w-3" /> {isAm ? 'ዕቃ አክል' : 'Add Product'}
+                    <Plus className="h-3 w-3" /> {t('transfers.addProduct')}
                   </button>
                 </div>
 
@@ -323,7 +392,7 @@ export default function TransfersList() {
                         }}
                         className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs bg-white"
                       >
-                        <option value="">{isAm ? 'ምርት ይምረጡ...' : 'Select Product...'}</option>
+                        <option value="">{t('transfers.selectProduct')}</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} ({p.sku})
@@ -333,9 +402,11 @@ export default function TransfersList() {
 
                       <input
                         type="number"
-                        min="1"
+                        min="0.01"
+                        step="0.01"
                         required
-                        placeholder="Qty"
+                        aria-label={t('transfers.quantityFor', { product: products.find((product) => String(product.id) === String(item.productId))?.name || t('transfers.item') })}
+                        placeholder={t('transfers.quantity')}
                         value={item.quantity}
                         onChange={(e) => {
                           const updated = [...transferItems]
@@ -349,6 +420,7 @@ export default function TransfersList() {
                         <button
                           type="button"
                           onClick={() => removeTransferItem(idx)}
+                          aria-label={t('transfers.removeProduct')}
                           className="text-slate-400 hover:text-red-600 p-1"
                         >
                           ✕
@@ -357,6 +429,11 @@ export default function TransfersList() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">{t('transfers.note')}</label>
+                <textarea rows="2" maxLength={300} value={note} onChange={(event) => setNote(event.target.value)} placeholder={t('transfers.notePlaceholder')} className="w-full rounded-lg border border-slate-300 p-2.5 text-xs focus:border-blue-500 focus:outline-none" />
               </div>
 
               <div className="mt-6 flex justify-end gap-2 pt-3 border-t">
@@ -372,11 +449,27 @@ export default function TransfersList() {
                   disabled={submitting}
                   className="rounded-xl bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {submitting ? t('common.loading') : isAm ? 'ጥያቄውን ላክ' : 'Send Transfer Request'}
+                  {submitting ? t('common.loading') : t('transfers.sendRequest')}
                 </button>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {rejectTransfer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={handleReject} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="transfer-reject-title">
+            <h3 id="transfer-reject-title" className="font-extrabold text-base text-slate-900">{t('transfers.reject')}</h3>
+            <p className="mt-2 text-sm text-slate-600">{t('transfers.rejectPrompt', { transfer: rejectTransfer.transferNumber })}</p>
+            <label className="mt-4 block text-xs font-bold text-slate-700">{t('transfers.rejectReason')}
+              <textarea rows="3" maxLength={300} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder={t('transfers.rejectReasonPlaceholder')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setRejectTransfer(null)} className="rounded-xl border border-slate-300 px-4 py-2 font-bold text-slate-600">{t('common.cancel')}</button>
+              <button type="submit" disabled={Boolean(actionLoading)} className="rounded-xl bg-red-600 px-4 py-2 font-bold text-white disabled:opacity-50">{actionLoading === `${rejectTransfer.id}:reject` ? t('common.loading') : t('transfers.confirmReject')}</button>
+            </div>
+          </form>
         </div>
       )}
     </div>

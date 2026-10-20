@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
 import { formatETB, formatDate } from '../../lib/ethiopianDate'
@@ -26,6 +27,7 @@ export default function PurchasesList() {
   const [branches, setBranches] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -45,16 +47,21 @@ export default function PurchasesList() {
 
   useEffect(() => {
     loadOrders()
-    api.get('/suppliers').then((r) => setSuppliers(r.data || [])).catch(() => {})
-    api.get('/branches').then((r) => setBranches(r.data || [])).catch(() => {})
-    api.get('/products').then((r) => setProducts(r.data || [])).catch(() => {})
+    loadReferenceList('/suppliers', setSuppliers)
+    loadReferenceList('/branches', setBranches)
+    loadReferenceList('/products', setProducts)
   }, [selectedBranchId])
+
+  const loadReferenceList = (path, setter) => api.get(path, { limit: 100 })
+    .then((response) => setter(Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []))
+    .catch(() => setter([]))
 
   const loadOrders = () => {
     setLoading(true)
+    setLoadError('')
     api.get('/purchase-orders', { branchId: selectedBranchId })
-      .then((res) => setOrders(res.data || []))
-      .catch((err) => console.error(err))
+      .then((res) => setOrders(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []))
+      .catch((err) => setLoadError(t(`errors.${err.code}`, { defaultValue: t('purchases.loadError') })))
       .finally(() => setLoading(false))
   }
 
@@ -79,13 +86,25 @@ export default function PurchasesList() {
     e.preventDefault()
     setErrorMsg('')
     if (!supplierId) {
-      setErrorMsg(isAm ? 'እባክዎ አቅራቢ ይምረጡ' : 'Please select a supplier')
+      setErrorMsg(t('purchases.selectSupplier'))
       return
     }
 
-    const validItems = lineItems.filter((i) => i.productId && Number(i.quantity) > 0)
+    const validItems = lineItems.filter((i) => i.productId && Number(i.quantity) > 0 && Number(i.unitCost) >= 0)
     if (validItems.length === 0) {
-      setErrorMsg(isAm ? 'እባክዎ ቢያንስ አንድ ምርት ይምረጡ' : 'Please add at least one valid product')
+      setErrorMsg(t('purchases.addValidItem'))
+      return
+    }
+    if (validItems.some((item) => !/^\d+(\.\d{1,2})?$/.test(String(item.quantity)) || !/^\d+(\.\d{1,2})?$/.test(String(item.unitCost)))) {
+      setErrorMsg(t('purchases.invalidNumbers'))
+      return
+    }
+    if (new Set(validItems.map((item) => String(item.productId))).size !== validItems.length) {
+      setErrorMsg(t('purchases.duplicateProduct'))
+      return
+    }
+    if (user?.role === 'ADMIN' && !destBranchId) {
+      setErrorMsg(t('purchases.branchRequired'))
       return
     }
 
@@ -93,7 +112,7 @@ export default function PurchasesList() {
     try {
       await api.post('/purchase-orders', {
         supplierId: Number(supplierId),
-        branchId: Number(destBranchId) || user?.branchId || 1,
+        ...(user?.role === 'ADMIN' ? { branchId: Number(destBranchId) } : {}),
         items: validItems.map((i) => ({
           productId: Number(i.productId),
           quantity: Number(i.quantity),
@@ -105,7 +124,7 @@ export default function PurchasesList() {
       setLineItems([{ productId: '', quantity: 1, unitCost: 0 }])
       loadOrders()
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to create PO')
+      setErrorMsg(t(`errors.${err.code}`, { defaultValue: t('purchases.saveError') }))
     } finally {
       setSubmitting(false)
     }
@@ -114,10 +133,10 @@ export default function PurchasesList() {
   // Handle Approval
   const handleApprove = async (poId) => {
     try {
-      await api.patch(`/purchase-orders/${poId}/approve`)
+      await api.post(`/purchase-orders/${poId}/approve`)
       loadOrders()
     } catch (err) {
-      alert(err.message || 'Error approving order')
+      setLoadError(t(`errors.${err.code}`, { defaultValue: t('purchases.actionError') }))
     }
   }
 
@@ -125,12 +144,12 @@ export default function PurchasesList() {
   const handleReject = async () => {
     if (!showRejectModal) return
     try {
-      await api.patch(`/purchase-orders/${showRejectModal.id}/reject`, { reason: rejectReason })
+      await api.post(`/purchase-orders/${showRejectModal.id}/reject`, { reason: rejectReason })
       setShowRejectModal(null)
       setRejectReason('')
       loadOrders()
     } catch (err) {
-      alert(err.message || 'Error rejecting order')
+      setErrorMsg(t(`errors.${err.code}`, { defaultValue: t('purchases.actionError') }))
     }
   }
 
@@ -156,7 +175,7 @@ export default function PurchasesList() {
         .filter((i) => i.quantity > 0)
 
       if (itemsPayload.length === 0) {
-        setErrorMsg(isAm ? 'እባክዎ የሚቀበሉትን ብዛት ያስገቡ' : 'Please enter quantity to receive')
+      setErrorMsg(t('purchases.enterReceiveQty'))
         setSubmitting(false)
         return
       }
@@ -167,7 +186,7 @@ export default function PurchasesList() {
       setShowReceiveModal(null)
       loadOrders()
     } catch (err) {
-      setErrorMsg(err.message || t(`errors.${err.code}`, 'Error receiving goods'))
+      setErrorMsg(t(`errors.${err.code}`, { defaultValue: t('purchases.actionError') }))
     } finally {
       setSubmitting(false)
     }
@@ -184,9 +203,7 @@ export default function PurchasesList() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {t('purchases.title')}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {isAm ? 'የግዢ ትዕዛዞች፣ የሥራ አስኪያጅ ማጽደቂያ እና የዕቃ መቀበያ' : 'Purchase orders, manager approval, and partial goods receiving'}
-          </p>
+          <p className="text-xs text-slate-500 mt-1">{t('purchases.description')}</p>
         </div>
 
         {user?.role !== 'AUDITOR' && (
@@ -199,6 +216,8 @@ export default function PurchasesList() {
           </button>
         )}
       </div>
+
+      {loadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{loadError}<button type="button" onClick={loadOrders} className="ml-2 font-bold underline">{t('common.retry')}</button></div>}
 
       {/* Orders Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-soft overflow-hidden">
@@ -220,20 +239,20 @@ export default function PurchasesList() {
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                  <td colSpan={user?.role === 'AUDITOR' ? 6 : 7} className="py-8 text-center text-slate-400">
                     {t('common.loading')}
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                  <td colSpan={user?.role === 'AUDITOR' ? 6 : 7} className="py-8 text-center text-slate-400">
                     {t('common.noData')}
                   </td>
                 </tr>
               ) : (
                 orders.map((po) => (
                   <tr key={po.id} className="hover:bg-slate-50/70">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-700">{po.poNumber}</td>
+                    <td className="py-3 px-4 font-mono font-bold"><Link to={`/purchases/${po.id}`} className="text-teal-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">{po.poNumber}</Link></td>
                     <td className="py-3 px-4 font-bold text-slate-900">{po.supplierName}</td>
                     <td className="py-3 px-4">{po.branchName}</td>
                     <td className="py-3 px-4 text-slate-500">{formatDate(po.createdAt, i18n.language)}</td>
@@ -337,11 +356,14 @@ export default function PurchasesList() {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">{t('purchases.branch')}</label>
                   <select
-                    value={destBranchId}
+                    required={user?.role === 'ADMIN'}
+                    disabled={user?.role !== 'ADMIN'}
+                    value={user?.role === 'ADMIN' ? destBranchId : String(user?.branchId ?? '')}
                     onChange={(e) => setDestBranchId(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
-                    {branches.map((b) => (
+                    {user?.role === 'ADMIN' && <option value="">{t('purchases.selectBranch')}</option>}
+                    {branches.filter((branch) => user?.role === 'ADMIN' || branch.id === user?.branchId).map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
@@ -380,7 +402,8 @@ export default function PurchasesList() {
 
                       <input
                         type="number"
-                        min="1"
+                        min="0.01"
+                        step="0.01"
                         required
                         placeholder="Qty"
                         value={item.quantity}
@@ -394,6 +417,7 @@ export default function PurchasesList() {
 
                       <input
                         type="number"
+                        min="0"
                         step="0.01"
                         required
                         placeholder="Unit Cost"
@@ -485,6 +509,7 @@ export default function PurchasesList() {
                           type="number"
                           min="0"
                           max={remaining}
+                          step="0.01"
                           value={receivingQuantities[it.id] ?? 0}
                           onChange={(e) =>
                             setReceivingQuantities({
@@ -531,7 +556,7 @@ export default function PurchasesList() {
             </p>
 
             <textarea
-              required
+              maxLength={300}
               rows="3"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}

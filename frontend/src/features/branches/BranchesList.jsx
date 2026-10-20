@@ -1,167 +1,183 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
-import { Building2, Plus, Phone, MapPin } from 'lucide-react'
+import { Building2, MapPin, Phone, Plus, Save, X } from 'lucide-react'
+
+const EMPTY_FORM = { name: '', code: '', address: '', phone: '' }
 
 export default function BranchesList() {
   const { user } = useAuth()
-  const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
-
+  const { t } = useTranslation()
+  const isAdmin = user?.role === 'ADMIN'
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [includeInactive, setIncludeInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [formData, setFormData] = useState({ name: '', code: '', address: '', phone: '' })
+  const [editingBranch, setEditingBranch] = useState(null)
+  const [formData, setFormData] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    loadBranches()
-  }, [])
-
-  const loadBranches = () => {
+  const loadBranches = useCallback(async () => {
     setLoading(true)
-    api.get('/branches')
-      .then((res) => setBranches(res.data || []))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false))
+    setError('')
+    try {
+      const result = await api.get('/branches', { includeInactive: includeInactive || undefined, limit: 100 })
+      setBranches(result.data || [])
+    } catch (err) {
+      setError(t(`errors.${err.code}`, { defaultValue: t('branches.loadError') }))
+    } finally {
+      setLoading(false)
+    }
+  }, [includeInactive, t])
+
+  useEffect(() => { loadBranches() }, [loadBranches])
+
+  const openCreate = () => {
+    setEditingBranch(null)
+    setFormData(EMPTY_FORM)
+    setError('')
+    setShowModal(true)
   }
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!formData.name || !formData.code) return
+  const openEdit = (branch) => {
+    setEditingBranch(branch)
+    setFormData({ name: branch.name || '', code: branch.code || '', address: branch.address || '', phone: branch.phone || '' })
+    setError('')
+    setShowModal(true)
+  }
+
+  const handleSave = async (event) => {
+    event.preventDefault()
     setSubmitting(true)
+    setError('')
     try {
-      await api.post('/branches', formData)
+      const payload = {
+        name: formData.name.trim(),
+        code: formData.code.trim().toUpperCase(),
+        address: formData.address.trim(),
+        phone: formData.phone.trim(),
+      }
+      if (editingBranch) await api.patch(`/branches/${editingBranch.id}`, payload)
+      else await api.post('/branches', payload)
       setShowModal(false)
-      setFormData({ name: '', code: '', address: '', phone: '' })
-      loadBranches()
+      setFormData(EMPTY_FORM)
+      await loadBranches()
     } catch (err) {
-      alert(err.message || 'Error creating branch')
+      setError(t(`errors.${err.code}`, { defaultValue: t('branches.saveError') }))
     } finally {
       setSubmitting(false)
     }
   }
 
+  const toggleActive = async (branch) => {
+    setError('')
+    try {
+      await api.patch(`/branches/${branch.id}`, { isActive: !branch.isActive })
+      await loadBranches()
+    } catch (err) {
+      setError(t(`errors.${err.code}`, { defaultValue: t('branches.statusError') }))
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {t('nav.branches')}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {isAm ? 'የሱቆች እና መጋዘኖች ቅርንጫፎች ዝርዝር እና መረጃ' : 'Shops and central warehouses in the multi-branch network'}
-          </p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{t('nav.branches')}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t('branches.description')}</p>
         </div>
-
-        {user?.role === 'ADMIN' && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
-          >
-            <Plus className="h-4 w-4" />
-            {isAm ? 'አዲስ ቅርንጫፍ አክል' : 'Add Branch'}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} className="rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+              {t('branches.showInactive')}
+            </label>
+          )}
+          {isAdmin && (
+            <button type="button" onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800">
+              <Plus className="h-4 w-4" aria-hidden="true" />{t('branches.add')}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          <div className="col-span-3 py-12 text-center text-xs text-slate-400">{t('common.loading')}</div>
-        ) : branches.map((b) => (
-          <div key={b.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold text-slate-900 text-sm">{b.name}</span>
-                <span className="rounded-md bg-blue-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-blue-700 border border-blue-200">
-                  {b.code}
-                </span>
-              </div>
-              <div className="mt-4 space-y-2 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                  <span>{b.address || 'Addis Ababa'}</span>
+      {error && !showModal && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
+
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-500" role="status">{t('common.loading')}</p>
+      ) : branches.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">{t('branches.empty')}</div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {branches.map((branch) => (
+            <article key={branch.id} className={`flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-soft ${branch.isActive ? 'border-slate-200' : 'border-amber-200 opacity-80'}`}>
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><Building2 className="h-4 w-4 text-teal-700" aria-hidden="true" />{branch.name}</h2>
+                  {branch.code && <span className="rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 font-mono text-[11px] font-bold text-teal-800">{branch.code}</span>}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 text-slate-400" />
-                  <span>{b.phone || '+251 911 000000'}</span>
+                <div className="mt-4 space-y-2 text-sm text-slate-600">
+                  {branch.address && <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" /><span>{branch.address}</span></div>}
+                  {branch.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" /><span>{branch.phone}</span></div>}
                 </div>
               </div>
-            </div>
-            <div className="mt-4 pt-3 border-t flex justify-between items-center text-[11px]">
-              <span className="text-slate-400 font-medium">Branch ID: #{b.id}</span>
-              <span className="font-bold text-emerald-600">Active</span>
-            </div>
-          </div>
-        ))}
-      </div>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                <span className={`font-bold ${branch.isActive ? 'text-emerald-700' : 'text-amber-700'}`}>{branch.isActive ? t('branches.active') : t('branches.inactive')}</span>
+                {isAdmin && <div className="flex gap-3">
+                  <button type="button" onClick={() => openEdit(branch)} className="font-semibold text-teal-800 underline-offset-2 hover:underline">{t('common.edit')}</button>
+                  <button type="button" onClick={() => toggleActive(branch)} className="font-semibold text-slate-600 underline-offset-2 hover:underline">
+                    {branch.isActive ? t('branches.deactivate') : t('branches.activate')}
+                  </button>
+                </div>}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="font-extrabold text-base text-slate-900">{isAm ? 'አዲስ ቅርንጫፍ አክል' : 'Add Branch'}</h3>
-            <form onSubmit={handleCreate} className="mt-4 space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowModal(false) }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="branch-dialog-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 id="branch-dialog-title" className="text-base font-extrabold text-slate-900">{editingBranch ? t('branches.editTitle') : t('branches.addTitle')}</h2>
+              <button type="button" onClick={() => setShowModal(false)} aria-label={t('common.cancel')} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleSave} className="mt-5 space-y-4">
+              {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</div>}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">{isAm ? 'የቅርንጫፍ ስም' : 'Branch Name'} *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Merkato Branch (መርካቶ)"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                />
+                <label htmlFor="branch-name" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.name')} *</label>
+                <input id="branch-name" name="name" type="text" required maxLength={150} autoFocus value={formData.name}
+                  onChange={(e) => setFormData((s) => ({ ...s, name: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">{isAm ? 'የቅርንጫፍ ኮድ' : 'Branch Code'} *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="e.g. MRK, BOLE, HAW"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:border-blue-500 focus:outline-none"
-                />
+                <label htmlFor="branch-code" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.code')}</label>
+                <input id="branch-code" name="code" type="text" maxLength={30} autoCapitalize="characters" value={formData.code}
+                  onChange={(e) => setFormData((s) => ({ ...s, code: e.target.value.toUpperCase() }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">{isAm ? 'አድራሻ' : 'Address'}</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="e.g. Merkato, Addis Ababa"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                />
+                <label htmlFor="branch-address" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.address')}</label>
+                <input id="branch-address" name="address" type="text" autoComplete="street-address" value={formData.address}
+                  onChange={(e) => setFormData((s) => ({ ...s, address: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">{isAm ? 'ስልክ' : 'Phone'}</label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+251 911 000000"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                />
+                <label htmlFor="branch-phone" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.phone')}</label>
+                <input id="branch-phone" name="phone" type="tel" autoComplete="tel" value={formData.phone}
+                  onChange={(e) => setFormData((s) => ({ ...s, phone: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>
-              <div className="flex justify-end gap-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {t('common.save')}
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common.cancel')}</button>
+                <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50">
+                  <Save className="h-4 w-4" aria-hidden="true" />{submitting ? t('common.loading') : t('common.save')}
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         </div>
       )}
     </div>

@@ -1,14 +1,17 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import LandingPage from './features/landing/LandingPage'
 import Login from './features/auth/Login'
 import Dashboard from './features/dashboard/Dashboard'
 import ProductsList from './features/products/ProductsList'
+import StockOverview from './features/stock/StockOverview'
 import SalesPos from './features/sales/SalesPos'
 import ReturnsList from './features/returns/ReturnsList'
 import PurchasesList from './features/purchases/PurchasesList'
+import PurchaseDetail from './features/purchases/PurchaseDetail'
 import TransfersList from './features/transfers/TransfersList'
+import TransferDetail from './features/transfers/TransferDetail'
 import AdjustmentsList from './features/adjustments/AdjustmentsList'
 import CategoriesList from './features/categories/CategoriesList'
 import SuppliersList from './features/suppliers/SuppliersList'
@@ -19,6 +22,7 @@ import AuditLogList from './features/audit/AuditLogList'
 import UsersList from './features/users/UsersList'
 import SettingsView from './features/settings/SettingsView'
 import ProfileView from './features/profile/ProfileView'
+import NotFound from './components/NotFound'
 import { ROLES } from './config/menu'
 
 export default function App() {
@@ -51,6 +55,14 @@ export default function App() {
           }
         />
         <Route
+          path="/stock"
+          element={
+            <ProtectedRoute roles={[ADMIN, MANAGER, STAFF, AUDITOR]}>
+              <StockOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/sales"
           element={
             <ProtectedRoute roles={[ADMIN, MANAGER, STAFF]}>
@@ -75,10 +87,26 @@ export default function App() {
           }
         />
         <Route
+          path="/purchases/:purchaseOrderId"
+          element={
+            <ProtectedRoute roles={[ADMIN, MANAGER, STAFF]}>
+              <PurchaseDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/transfers"
           element={
             <ProtectedRoute roles={[ADMIN, MANAGER, STAFF]}>
               <TransfersList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transfers/:transferId"
+          element={
+            <ProtectedRoute roles={[ADMIN, MANAGER, STAFF]}>
+              <TransferDetail />
             </ProtectedRoute>
           }
         />
@@ -93,7 +121,7 @@ export default function App() {
         <Route
           path="/categories"
           element={
-            <ProtectedRoute roles={[ADMIN]}>
+            <ProtectedRoute roles={[ADMIN, MANAGER, STAFF, AUDITOR]}>
               <CategoriesList />
             </ProtectedRoute>
           }
@@ -109,7 +137,7 @@ export default function App() {
         <Route
           path="/branches"
           element={
-            <ProtectedRoute roles={[ADMIN]}>
+            <ProtectedRoute roles={[ADMIN, MANAGER, STAFF, AUDITOR]}>
               <BranchesList />
             </ProtectedRoute>
           }
@@ -164,7 +192,7 @@ export default function App() {
         />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }

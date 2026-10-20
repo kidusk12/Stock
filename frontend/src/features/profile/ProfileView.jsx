@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
+import { errorKey } from '../../lib/errorMessages'
 import UserAvatar from '../../components/UserAvatar'
 import {
   User,
@@ -51,6 +52,7 @@ export default function ProfileView() {
     confirmPassword: '',
   })
   const [passwordStatus, setPasswordStatus] = useState({ success: '', error: '' })
+  const [passwordSaving, setPasswordSaving] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
@@ -144,34 +146,45 @@ export default function ProfileView() {
     e.preventDefault()
     setPasswordStatus({ success: '', error: '' })
 
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordStatus({ success: '', error: t('auth.errors.required') })
+      return
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordStatus({
         success: '',
-        error: isAm ? 'አዲሱ የይለፍ ቃል አይዛመድም' : 'New passwords do not match',
+        error: t('auth.errors.passwordMismatch'),
       })
       return
     }
 
-    if (passwordData.newPassword.length < 6) {
+    if (passwordData.newPassword.length < 8) {
       setPasswordStatus({
         success: '',
-        error: isAm ? 'የይለፍ ቃል ቢያንስ 6 ፊደላት መሆን አለበት' : 'Password must be at least 6 characters',
+        error: t('auth.errors.passwordTooShort'),
       })
       return
     }
 
+    setPasswordSaving(true)
     try {
-      await api.post('/auth/change-password', passwordData)
+      await api.post('/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      })
       setPasswordStatus({
-        success: isAm ? 'የይለፍ ቃል በተሳካ ሁኔታ ተቀይሯል!' : 'Password changed successfully!',
+        success: t('auth.passwordChanged'),
         error: '',
       })
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err) {
       setPasswordStatus({
         success: '',
-        error: err.message || (isAm ? 'የይለፍ ቃል መቀየር አልተሳካም' : 'Error updating password'),
+        error: t(errorKey(err)),
       })
+    } finally {
+      setPasswordSaving(false)
     }
   }
 
@@ -446,32 +459,36 @@ export default function ProfileView() {
           {/* Form 2: Change Password */}
           <form
             onSubmit={handlePasswordChange}
+            noValidate
             className="bg-white rounded-2xl border border-[#cfdde3] p-6 shadow-clean space-y-4"
           >
             <h2 className="text-xs font-bold text-[#15343f] uppercase tracking-wide mb-2 flex items-center gap-2">
               <KeyRound className="h-4 w-4 text-[#4f7988]" />
-              <span>{isAm ? 'የይለፍ ቃል ቀይር' : 'Change Password'}</span>
+              <span>{t('auth.changePassword')}</span>
             </h2>
 
             {passwordStatus.error && (
-              <div className="p-3 rounded-xl bg-[#fbece5] text-[#c66749] text-xs font-semibold border border-[#f5d5c6]">
+              <div id="password-error" role="alert" aria-live="assertive" className="p-3 rounded-xl bg-[#fbece5] text-[#c66749] text-xs font-semibold border border-[#f5d5c6]">
                 {passwordStatus.error}
               </div>
             )}
 
             {passwordStatus.success && (
-              <div className="p-3 rounded-xl bg-[#e3f2ec] text-[#1c6953] text-xs font-semibold border border-[#c1e5d7]">
+              <div id="password-success" role="status" aria-live="polite" className="p-3 rounded-xl bg-[#e3f2ec] text-[#1c6953] text-xs font-semibold border border-[#c1e5d7]">
                 {passwordStatus.success}
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-bold text-[#15343f] mb-1.5">
-                {isAm ? 'የአሁኑ የይለፍ ቃል' : 'Current Password'}
+              <label htmlFor="current-password" className="block text-xs font-bold text-[#15343f] mb-1.5">
+                  {t('auth.currentPassword')}
               </label>
               <input
                 type="password"
-                required
+                id="current-password"
+                autoComplete="current-password"
+                aria-required="true"
+                aria-describedby={passwordStatus.error ? 'password-error' : undefined}
                 value={passwordData.currentPassword}
                 onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                 placeholder="••••••••"
@@ -481,12 +498,15 @@ export default function ProfileView() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[#15343f] mb-1.5">
-                  {isAm ? 'አዲስ የይለፍ ቃል' : 'New Password'}
+                <label htmlFor="new-password" className="block text-xs font-bold text-[#15343f] mb-1.5">
+                  {t('auth.newPassword')}
                 </label>
                 <input
                   type="password"
-                  required
+                  id="new-password"
+                  autoComplete="new-password"
+                  aria-required="true"
+                  aria-describedby={passwordStatus.error ? 'password-error' : undefined}
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   placeholder="••••••••"
@@ -495,12 +515,15 @@ export default function ProfileView() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#15343f] mb-1.5">
-                  {isAm ? 'አዲሱን የይለፍ ቃል አረጋግጥ' : 'Confirm New Password'}
+                <label htmlFor="confirm-password" className="block text-xs font-bold text-[#15343f] mb-1.5">
+                  {t('auth.confirmNewPassword')}
                 </label>
                 <input
                   type="password"
-                  required
+                  id="confirm-password"
+                  autoComplete="new-password"
+                  aria-required="true"
+                  aria-describedby={passwordStatus.error ? 'password-error' : undefined}
                   value={passwordData.confirmPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                   placeholder="••••••••"
@@ -512,10 +535,11 @@ export default function ProfileView() {
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-xl bg-[#edf3f6] hover:bg-[#e2edf2] text-[#173d4a] px-4 py-2.5 text-xs font-bold border border-[#cadbe2] transition"
+                disabled={passwordSaving}
+                className="flex items-center gap-2 rounded-xl bg-[#edf3f6] hover:bg-[#e2edf2] text-[#173d4a] px-4 py-2.5 text-xs font-bold border border-[#cadbe2] transition disabled:opacity-50"
               >
                 <RotateCcw className="h-4 w-4" />
-                <span>{isAm ? 'የይለፍ ቃል አድስ' : 'Update Password'}</span>
+                <span>{passwordSaving ? t('common.loading') : t('auth.updatePassword')}</span>
               </button>
             </div>
           </form>

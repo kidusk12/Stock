@@ -1,79 +1,133 @@
-// Ethiopian Calendar conversion & ETB currency formatting
+import i18n from '../i18n'
 
-const ETH_MONTHS_EN = [
-  'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yakatit',
-  'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
-]
+// Ethiopia uses UTC+3 throughout the year and does not observe daylight saving.
+const JDN_OFFSET = 1723856
+export const ETHIOPIA_UTC_OFFSET_HOURS = 3
 
-const ETH_MONTHS_AM = [
-  'መስከረም', 'ጥቅምት', 'ኅዳር', 'ታኅሣሥ', 'ጥር', 'የካቲት',
-  'መጋቢት', 'ሚያዝያ', 'ግንቦት', 'ሰኔ', 'ሐምሌ', 'ነሐሴ', 'ጳጉሜ'
-]
+export const isEthiopianLeapYear = (year) => year % 4 === 3
 
-/**
- * Converts a Gregorian Date to Ethiopian Date
- * @param {Date|string|number} inputDate 
- * @returns {{ year: number, month: number, day: number, monthNameEn: string, monthNameAm: string, formattedEn: string, formattedAm: string }}
- */
-export function toEthiopianDate(inputDate) {
-  const date = inputDate ? new Date(inputDate) : new Date()
-  if (isNaN(date.getTime())) return null
+export function daysInEthiopianMonth(year, month) {
+  if (month < 13) return 30
+  return isEthiopianLeapYear(year) ? 6 : 5
+}
 
-  const gYear = date.getFullYear()
-  const gMonth = date.getMonth() + 1 // 1-12
-  const gDay = date.getDate()
+export function isValidEthiopianDate(year, month, day) {
+  return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day) &&
+    year >= 1 && month >= 1 && month <= 13 && day >= 1 &&
+    day <= daysInEthiopianMonth(year, month)
+}
 
-  // Julian day calculation
-  const a = Math.floor((14 - gMonth) / 12)
-  const y = gYear + 4800 - a
-  const m = gMonth + 12 * a - 3
-  const jdn = gDay + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045
+function gregorianToJdn(year, month, day) {
+  const a = Math.floor((14 - month) / 12)
+  const y = year + 4800 - a
+  const m = month + 12 * a - 3
+  return day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) -
+    Math.floor(y / 100) + Math.floor(y / 400) - 32045
+}
 
-  // Ethiopian calendar epoch offset
-  const ethEpoch = 1723856
-  const r = (jdn - ethEpoch) % 1461
-  const n = (r % 365) + 365 * Math.floor(r / 1460)
-
-  const ethYear = 4 * Math.floor((jdn - ethEpoch) / 1461) + Math.floor(r / 365) - Math.floor(r / 1460)
-  const ethMonth = Math.floor(n / 30) + 1
-  const ethDay = (n % 30) + 1
-
-  const monthIdx = Math.min(Math.max(ethMonth - 1, 0), 12)
-  const monthNameEn = ETH_MONTHS_EN[monthIdx]
-  const monthNameAm = ETH_MONTHS_AM[monthIdx]
-
+function jdnToGregorian(jdn) {
+  const a = jdn + 32044
+  const b = Math.floor((4 * a + 3) / 146097)
+  const c = a - Math.floor(146097 * b / 4)
+  const d = Math.floor((4 * c + 3) / 1461)
+  const e = c - Math.floor(1461 * d / 4)
+  const m = Math.floor((5 * e + 2) / 153)
   return {
-    year: ethYear,
-    month: ethMonth,
-    day: ethDay,
-    monthNameEn,
-    monthNameAm,
-    formattedEn: `${monthNameEn} ${ethDay}, ${ethYear}`,
-    formattedAm: `${monthNameAm} ${ethDay} ቀን ${ethYear} ዓ.ም`,
+    day: e - Math.floor((153 * m + 2) / 5) + 1,
+    month: m + 3 - 12 * Math.floor(m / 10),
+    year: 100 * b + d - 4800 + Math.floor(m / 10),
   }
 }
 
-/**
- * Format currency in ETB (Ethiopian Birr)
- * @param {number|string} amount 
- * @param {string} lang 'en' or 'am'
- * @returns {string} e.g. "ETB 1,250.00" or "1,250.00 ብር"
- */
+function ethiopianToJdn(year, month, day) {
+  return JDN_OFFSET + 365 + 365 * (year - 1) + Math.floor(year / 4) + 30 * month + day - 31
+}
+
+function jdnToEthiopian(jdn) {
+  const r = (jdn - JDN_OFFSET) % 1461
+  const n = (r % 365) + 365 * Math.floor(r / 1460)
+  return {
+    year: 4 * Math.floor((jdn - JDN_OFFSET) / 1461) + Math.floor(r / 365) - Math.floor(r / 1460),
+    month: Math.floor(n / 30) + 1,
+    day: n % 30 + 1,
+  }
+}
+
+export const gregorianToEthiopian = (year, month, day) =>
+  jdnToEthiopian(gregorianToJdn(year, month, day))
+
+export const ethiopianToGregorian = (year, month, day) =>
+  jdnToGregorian(ethiopianToJdn(year, month, day))
+
+const pad = (value, width = 2) => String(value).padStart(width, '0')
+
+export function ethiopianToApiDate(year, month, day) {
+  if (!isValidEthiopianDate(year, month, day)) return null
+  const gregorian = ethiopianToGregorian(year, month, day)
+  return `${pad(gregorian.year, 4)}-${pad(gregorian.month)}-${pad(gregorian.day)}`
+}
+
+export function apiDateToEthiopian(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '')
+  if (!match) return null
+  const [, year, month, day] = match.map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null
+  return gregorianToEthiopian(year, month, day)
+}
+
+export function toEthiopiaTime(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const shifted = new Date(date.getTime() + ETHIOPIA_UTC_OFFSET_HOURS * 3600000)
+  const gregorian = {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  }
+  return {
+    ethiopian: gregorianToEthiopian(gregorian.year, gregorian.month, gregorian.day),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
+  }
+}
+
+export const todayEthiopian = () => toEthiopiaTime(new Date())?.ethiopian ?? null
+
+// Existing screen-facing API is retained for compatibility.
+export function toEthiopianDate(inputDate) {
+  if (inputDate === '') return null
+  const value = inputDate === null || inputDate === undefined ? new Date() : inputDate
+  const localTime = toEthiopiaTime(value)
+  if (!localTime) return null
+  const { year, month, day } = localTime.ethiopian
+  const monthNameEn = i18n.getFixedT('en')('calendar.months', { returnObjects: true })[month - 1]
+  const monthNameAm = i18n.getFixedT('am')('calendar.months', { returnObjects: true })[month - 1]
+  return {
+    year,
+    month,
+    day,
+    monthNameEn,
+    monthNameAm,
+    formattedEn: `${monthNameEn} ${day}, ${year}`,
+    formattedAm: `${monthNameAm} ${day} ቀን ${year} ዓ.ም`,
+  }
+}
+
 export function formatETB(amount, lang = 'en') {
-  const num = Number(amount) || 0
-  const formatted = num.toLocaleString('en-US', {
+  if (amount === null || amount === undefined || amount === '') return '—'
+  const numericAmount = Number(amount)
+  if (!Number.isFinite(numericAmount)) return '—'
+  const formatted = numericAmount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
   return lang === 'am' ? `${formatted} ብር` : `ETB ${formatted}`
 }
 
-/**
- * Formats a date string into readable Ethiopian date or fallback Gregorian
- */
-export function formatDate(isoDate, lang = 'en') {
-  if (!isoDate) return '-'
-  const eth = toEthiopianDate(isoDate)
+export function formatDate(value, lang = 'en') {
+  if (value === null || value === undefined || value === '') return '-'
+  const eth = toEthiopianDate(value)
   if (!eth) return '-'
   return lang === 'am' ? eth.formattedAm : eth.formattedEn
 }

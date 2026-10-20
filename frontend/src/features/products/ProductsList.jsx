@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
@@ -10,10 +10,6 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   Building2,
-  Barcode,
-  CheckCircle2,
-  XCircle,
-  Eye,
   Upload,
   Download
 } from 'lucide-react'
@@ -22,15 +18,24 @@ export default function ProductsList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
   const isAm = i18n.language === 'am'
+  const isAdmin = user?.role === 'ADMIN'
 
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedCat, setSelectedCat] = useState('')
+  const [includeInactive, setIncludeInactive] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [pageCount, setPageCount] = useState(1)
+  const [pageError, setPageError] = useState('')
+  const [stockRows, setStockRows] = useState([])
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
   const [showBranchModal, setShowBranchModal] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
 
@@ -43,99 +48,174 @@ export default function ProductsList() {
     unit: 'piece',
     costPrice: '',
     sellingPrice: '',
-    openingStock: '0',
-    minQuantity: '10',
-    maxQuantity: '100',
   })
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   // CSV Import state
-  const [importRows, setImportRows] = useState([])
-  const [importValidation, setImportValidation] = useState(null)
+  const [importFile, setImportFile] = useState(null)
+  const [importBranchId, setImportBranchId] = useState(selectedBranchId ? String(selectedBranchId) : '')
+  const [importResult, setImportResult] = useState(null)
+  const [importError, setImportError] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true)
+    setPageError('')
+    try {
+      const params = { branchId: selectedBranchId || undefined, q: search || undefined, categoryId: selectedCat || undefined, includeInactive: includeInactive || undefined, page, limit: 20 }
+      const [productResult, initialStockResult] = await Promise.all([
+        api.get('/products', params),
+        api.get('/stock', { branchId: selectedBranchId || undefined, page: 1, limit: 100 }),
+      ])
+      const stockPages = Math.ceil((initialStockResult.total || 0) / 100)
+      const extraStockPages = stockPages > 1 ? await Promise.all(Array.from({ length: stockPages - 1 }, (_, index) =>
+        api.get('/stock', { branchId: selectedBranchId || undefined, page: index + 2, limit: 100 })
+      )) : []
+      const rows = [...(initialStockResult.data || []), ...extraStockPages.flatMap((result) => result.data || [])]
+      setStockRows(rows)
+      setTotal(productResult.total ?? productResult.data?.length ?? 0)
+      setPageCount(Math.max(1, Math.ceil((productResult.total ?? 0) / (productResult.limit || 20))))
+      setProducts((productResult.data || []).map((product) => {
+        const productStocks = rows.filter((row) => row.productId === product.id)
+        const selectedStock = selectedBranchId ? productStocks.find((row) => row.branchId === Number(selectedBranchId)) : null
+        return {
+          ...product,
+          branchStocks: productStocks,
+          quantity: selectedStock?.quantity ?? productStocks.reduce((sum, row) => sum + row.quantity, 0),
+          minQuantity: selectedStock?.minQuantity ?? 0,
+          isLowStock: selectedStock ? selectedStock.minQuantity > 0 && selectedStock.quantity <= selectedStock.minQuantity
+            : productStocks.some((row) => row.minQuantity > 0 && row.quantity <= row.minQuantity),
+        }
+      }))
+    } catch (err) {
+      setPageError(t(`errors.${err.code}`, { defaultValue: t('products.loadError') }))
+    } finally {
+      setLoading(false)
+    }
+  }, [includeInactive, page, search, selectedBranchId, selectedCat, t])
 
   useEffect(() => {
     loadProducts()
-    api.get('/categories').then((res) => setCategories(res.data || [])).catch(() => {})
-  }, [selectedBranchId, search, selectedCat])
+  }, [loadProducts])
 
-  const loadProducts = () => {
-    setLoading(true)
-    api.get('/products', {
-      branchId: selectedBranchId,
-      q: search,
-      categoryId: selectedCat || undefined,
-    })
-      .then((res) => {
-        setProducts(res.data || [])
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false))
+  useEffect(() => {
+    api.get('/categories').then((res) => setCategories(res.data || [])).catch(() => {})
+    api.get('/branches').then((res) => setBranches(res.data || [])).catch(() => {})
+  }, [])
+
+  const openCreateProduct = () => {
+    setEditingProduct(null)
+    setFormData({ name: '', sku: '', barcode: '', categoryId: '', unit: '', costPrice: '', sellingPrice: '' })
+    setFormError('')
+    setShowAddModal(true)
   }
 
-  const handleCreateProduct = async (e) => {
+  const openEditProduct = (product) => {
+    setEditingProduct(product)
+    setFormData({
+      name: product.name || '', sku: product.sku || '', barcode: product.barcode || '',
+      categoryId: String(product.categoryId || ''), unit: product.unit || '',
+      costPrice: String(product.costPrice ?? ''), sellingPrice: String(product.sellingPrice ?? ''),
+    })
+    setFormError('')
+    setShowAddModal(true)
+  }
+
+  const handleSaveProduct = async (e) => {
     e.preventDefault()
     setFormError('')
     setSubmitting(true)
 
     try {
-      await api.post('/products', formData)
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        sku: formData.sku.trim(),
+        barcode: formData.barcode.trim() || null,
+        categoryId: Number(formData.categoryId),
+        unit: formData.unit.trim(),
+        costPrice: Number(formData.costPrice),
+        sellingPrice: Number(formData.sellingPrice),
+      }
+      if (editingProduct) await api.patch(`/products/${editingProduct.id}`, payload)
+      else await api.post('/products', payload)
       setShowAddModal(false)
-      setFormData({
-        name: '',
-        sku: '',
-        barcode: '',
-        categoryId: '1',
-        unit: 'piece',
-        costPrice: '',
-        sellingPrice: '',
-        openingStock: '0',
-        minQuantity: '10',
-        maxQuantity: '100',
-      })
+      setFormData({ name: '', sku: '', barcode: '', categoryId: '', unit: '', costPrice: '', sellingPrice: '' })
       loadProducts()
     } catch (err) {
-      setFormError(err.message || t(`errors.${err.code}`, 'Error saving product'))
+      setFormError(t(`errors.${err.code}`, { defaultValue: t('products.saveError') }))
     } finally {
       setSubmitting(false)
     }
   }
 
-  // CSV Import simulation
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+  const toggleProductActive = async (product) => {
+    setPageError('')
+    try {
+      await api.patch(`/products/${product.id}`, { isActive: !product.isActive })
+      await loadProducts()
+    } catch (err) {
+      setPageError(t(`errors.${err.code}`, { defaultValue: t('products.statusError') }))
+    }
+  }
 
-    // Preview sample data
-    const preview = [
-      { name: 'Brown Teff 25kg', sku: 'TEF-BRN', barcode: '6001009', unit: 'bag', costPrice: 3400, sellingPrice: 3900, status: 'VALID' },
-      { name: 'Pure Honey 1kg', sku: 'HNY-1KG', barcode: '6001010', unit: 'jar', costPrice: 400, sellingPrice: 550, status: 'VALID' },
-      { name: 'Invalid Duplicate SKU', sku: 'SUG-50', barcode: '6001011', unit: 'bag', costPrice: 200, sellingPrice: 250, status: 'ERROR', error: 'Duplicate SKU' },
-    ]
-    setImportRows(preview)
-    setImportValidation({ valid: 2, errors: 1 })
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    setImportFile(file)
+    setImportResult(null)
+    setImportError('')
+    setImportBusy(true)
+    try {
+      const upload = new FormData()
+      upload.append('file', file)
+      if (importBranchId) upload.append('branchId', importBranchId)
+      const result = await api.post('/import/products?dryRun=true', upload)
+      setImportResult(result)
+    } catch (err) {
+      setImportError(err.code === 'VALIDATION_ERROR' && !importBranchId
+        ? t('products.selectOpeningBranch')
+        : t(`errors.${err.code}`, { defaultValue: t('products.importError') }))
+    } finally {
+      setImportBusy(false)
+    }
   }
 
   const confirmImport = async () => {
-    // Add valid rows
-    for (const r of importRows.filter(x => x.status === 'VALID')) {
-      await api.post('/products', {
-        name: r.name,
-        sku: r.sku,
-        barcode: r.barcode,
-        categoryId: 1,
-        unit: r.unit,
-        costPrice: r.costPrice,
-        sellingPrice: r.sellingPrice,
-        openingStock: 20,
-        minQuantity: 10,
-        maxQuantity: 100
-      }).catch(() => {})
+    if (!importFile) return
+    setImportBusy(true)
+    setImportError('')
+    try {
+      const upload = new FormData()
+      upload.append('file', importFile)
+      if (importBranchId) upload.append('branchId', importBranchId)
+      const result = await api.post('/import/products?dryRun=false', upload)
+      setImportResult(result)
+      setImportFile(null)
+      await loadProducts()
+    } catch (err) {
+      setImportError(err.code === 'VALIDATION_ERROR' && !importBranchId
+        ? t('products.selectOpeningBranch')
+        : t(`errors.${err.code}`, { defaultValue: t('products.importError') }))
+    } finally {
+      setImportBusy(false)
     }
-    setShowImportModal(false)
-    setImportRows([])
-    setImportValidation(null)
-    loadProducts()
+  }
+
+  const downloadTemplate = async () => {
+    try {
+      const blob = await api.download('/import/products/template')
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'products-import-template.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setPageError(t(`errors.${err.code}`, { defaultValue: t('products.templateError') }))
+    }
   }
 
   return (
@@ -155,14 +235,14 @@ export default function ProductsList() {
           {user?.role === 'ADMIN' && (
             <>
               <button
-                onClick={() => setShowImportModal(true)}
+                onClick={() => { setImportFile(null); setImportResult(null); setImportError(''); setImportBranchId(selectedBranchId ? String(selectedBranchId) : ''); setShowImportModal(true) }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
                 {t('products.importCsv')}
               </button>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={openCreateProduct}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
               >
                 <Plus className="h-4 w-4" />
@@ -180,7 +260,7 @@ export default function ProductsList() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             placeholder={t('products.scanBarcode')}
             className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2 text-xs focus:border-blue-500 focus:outline-none"
           />
@@ -189,7 +269,7 @@ export default function ProductsList() {
         <div className="w-full sm:w-56">
           <select
             value={selectedCat}
-            onChange={(e) => setSelectedCat(e.target.value)}
+            onChange={(e) => { setSelectedCat(e.target.value); setPage(1) }}
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:border-blue-500 focus:outline-none"
           >
             <option value="">{isAm ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
@@ -200,7 +280,13 @@ export default function ProductsList() {
             ))}
           </select>
         </div>
+        {isAdmin && <label className="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-600">
+          <input type="checkbox" checked={includeInactive} onChange={(e) => { setIncludeInactive(e.target.checked); setPage(1) }} className="rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+          {t('products.showInactive')}
+        </label>}
       </div>
+
+      {pageError && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{pageError}</div>}
 
       {/* Products Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-soft overflow-hidden">
@@ -222,13 +308,13 @@ export default function ProductsList() {
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                  <td colSpan={user?.role === 'STAFF' ? 6 : 7} className="py-8 text-center text-slate-400" role="status">
                     {t('common.loading')}
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">
+                  <td colSpan={user?.role === 'STAFF' ? 6 : 7} className="py-8 text-center text-slate-400">
                     {t('common.noData')}
                   </td>
                 </tr>
@@ -237,6 +323,7 @@ export default function ProductsList() {
                   <tr key={p.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-3 px-4 font-bold text-slate-900">
                       {p.name}
+                      {p.isActive === false && <span className="ml-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">{t('products.inactive')}</span>}
                       {p.isLowStock && (
                         <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
                           <AlertTriangle className="h-3 w-3" />
@@ -250,7 +337,7 @@ export default function ProductsList() {
                     </td>
                     <td className="py-3 px-4">
                       <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                        {p.categoryName || 'General'}
+                        {p.categoryName || '—'}
                       </span>
                     </td>
                     {user?.role !== 'STAFF' && (
@@ -271,14 +358,15 @@ export default function ProductsList() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => setShowBranchModal(p)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition"
-                        title="View stock across branches"
-                      >
-                        <Building2 className="h-3.5 w-3.5 text-blue-600" />
-                        {t('products.branchStock')}
-                      </button>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button type="button" onClick={() => setShowBranchModal(p)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition" aria-label={`${t('products.branchStock')}: ${p.name}`}>
+                          <Building2 className="h-3.5 w-3.5 text-teal-700" aria-hidden="true" />{t('products.branchStock')}
+                        </button>
+                        {isAdmin && <>
+                          <button type="button" onClick={() => openEditProduct(p)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-teal-800 hover:bg-teal-50">{t('common.edit')}</button>
+                          <button type="button" onClick={() => toggleProductActive(p)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-50">{p.isActive === false ? t('products.activate') : t('products.deactivate')}</button>
+                        </>}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -287,6 +375,12 @@ export default function ProductsList() {
           </table>
         </div>
       </div>
+
+      {!loading && pageCount > 1 && <div className="flex items-center justify-between text-sm text-slate-600">
+        <span>{t('products.pageSummary', { page, pageCount, total })}</span>
+        <div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">{t('common.previous')}</button>
+          <button type="button" disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">{t('common.next')}</button></div>
+      </div>}
 
       {/* Stock Per Branch Modal */}
       {showBranchModal && (
@@ -343,7 +437,7 @@ export default function ProductsList() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-extrabold text-base text-slate-900">{t('products.addProduct')}</h3>
+              <h3 className="font-extrabold text-base text-slate-900">{editingProduct ? t('products.editProduct') : t('products.addProduct')}</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">
                 ✕
               </button>
@@ -355,12 +449,14 @@ export default function ProductsList() {
               </div>
             )}
 
-            <form onSubmit={handleCreateProduct} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleSaveProduct} className="mt-4 space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">{t('products.name')} *</label>
+                  <label htmlFor="product-name" className="block font-bold text-slate-700 mb-1">{t('products.name')} *</label>
                 <input
+                    id="product-name"
                   type="text"
                   required
+                    maxLength={150}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Sugar 50kg (ስኳር 50 ኪ.ግ)"
@@ -370,10 +466,12 @@ export default function ProductsList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.sku')} *</label>
+                  <label htmlFor="product-sku" className="block font-bold text-slate-700 mb-1">{t('products.sku')} *</label>
                   <input
+                    id="product-sku"
                     type="text"
                     required
+                    maxLength={50}
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     placeholder="e.g. SUG-50"
@@ -381,9 +479,11 @@ export default function ProductsList() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.barcode')}</label>
+                  <label htmlFor="product-barcode" className="block font-bold text-slate-700 mb-1">{t('products.barcode')}</label>
                   <input
+                    id="product-barcode"
                     type="text"
+                    maxLength={50}
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                     placeholder="e.g. 6001001"
@@ -394,21 +494,26 @@ export default function ProductsList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.category')}</label>
+                  <label htmlFor="product-category" className="block font-bold text-slate-700 mb-1">{t('products.category')} *</label>
                   <select
+                    id="product-category"
+                    required
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
+                    <option value="">{t('products.selectCategory')}</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.unit')}</label>
+                  <label htmlFor="product-unit" className="block font-bold text-slate-700 mb-1">{t('products.unit')} *</label>
                   <input
+                    id="product-unit"
                     type="text"
+                    required
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     placeholder="bag, kg, piece, carton"
@@ -419,9 +524,11 @@ export default function ProductsList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB)</label>
+                  <label htmlFor="product-cost" className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB)</label>
                   <input
+                    id="product-cost"
                     type="number"
+                    min="0"
                     step="0.01"
                     required
                     value={formData.costPrice}
@@ -431,44 +538,16 @@ export default function ProductsList() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB)</label>
+                  <label htmlFor="product-selling-price" className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB)</label>
                   <input
+                    id="product-selling-price"
                     type="number"
+                    min="0"
                     step="0.01"
                     required
                     value={formData.sellingPrice}
                     onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
                     placeholder="3450.00"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">{isAm ? 'መነሻ ክምችት' : 'Opening Stock'}</label>
-                  <input
-                    type="number"
-                    value={formData.openingStock}
-                    onChange={(e) => setFormData({ ...formData, openingStock: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.minQuantity')}</label>
-                  <input
-                    type="number"
-                    value={formData.minQuantity}
-                    onChange={(e) => setFormData({ ...formData, minQuantity: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">{t('products.maxQuantity')}</label>
-                  <input
-                    type="number"
-                    value={formData.maxQuantity}
-                    onChange={(e) => setFormData({ ...formData, maxQuantity: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -501,67 +580,57 @@ export default function ProductsList() {
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-extrabold text-base text-slate-900">{t('products.importCsv')}</h3>
-              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+              <button type="button" onClick={() => setShowImportModal(false)} aria-label={t('common.close')} className="text-slate-400 hover:text-slate-600 font-bold">
                 ✕
               </button>
             </div>
 
             <div className="mt-4 space-y-4 text-xs">
-              <p className="text-slate-600">
-                {isAm
-                  ? 'ምርቶችን በብዛት በአንድ ጊዜ ለማስመጣት የ CSV ፋይል ይጫኑ። ስርዓቱ መረጃውን አስቀድሞ በመፈተሽ ትክክለኛነቱን ያረጋግጣል።'
-                  : 'Upload a CSV file to import multiple products at once. The system will preview and validate every row before inserting.'}
-              </p>
-
-              <div className="rounded-xl border-2 border-dashed border-slate-300 p-6 text-center hover:bg-slate-50 transition cursor-pointer">
-                <Upload className="mx-auto h-8 w-8 text-slate-400" />
-                <label className="mt-2 block font-bold text-blue-600 cursor-pointer">
-                  <span>{isAm ? 'የ CSV ፋይል ይምረጡ' : 'Select a CSV file to upload'}</span>
-                  <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+              <p className="text-slate-600">{t('products.importDescription')}</p>
+              <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" aria-hidden="true" />{t('products.downloadTemplate')}</button>
+              <label className="block text-sm font-semibold text-slate-700">{t('products.openingStockBranch')}
+                <select value={importBranchId} onChange={(e) => { setImportBranchId(e.target.value); setImportResult(null) }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal">
+                  <option value="">{t('products.noOpeningStock')}</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </select>
+              </label>
+              <div className="rounded-xl border-2 border-dashed border-slate-300 p-5 text-center">
+                <Upload className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
+                <label className="mt-2 block cursor-pointer font-bold text-teal-800">{t('products.chooseCsv')}
+                  <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} className="sr-only" />
                 </label>
-                <p className="mt-1 text-[11px] text-slate-400">Columns: Name, SKU, Barcode, Unit, CostPrice, SellingPrice</p>
+                {importFile && <p className="mt-1 text-slate-500">{importFile.name}</p>}
               </div>
-
-              {importValidation && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-emerald-700 flex items-center gap-1">
-                      <CheckCircle2 className="h-4 w-4" /> {importValidation.valid} Valid rows ready
-                    </span>
-                    <span className="text-red-600 flex items-center gap-1">
-                      <XCircle className="h-4 w-4" /> {importValidation.errors} Errors found
-                    </span>
-                  </div>
-
-                  <div className="max-h-40 overflow-y-auto divide-y divide-slate-200 border rounded-lg bg-white">
-                    {importRows.map((r, i) => (
-                      <div key={i} className={`p-2 flex justify-between items-center text-[11px] ${r.status === 'ERROR' ? 'bg-red-50 text-red-700' : ''}`}>
-                        <span>{r.name} ({r.sku})</span>
-                        {r.status === 'ERROR' ? (
-                          <span className="font-bold">{r.error}</span>
-                        ) : (
-                          <span className="text-emerald-600 font-semibold">Valid</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {importError && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{importError}</div>}
+              {importBusy && <p className="text-center text-slate-500" role="status">{t('common.loading')}</p>}
+              {importResult?.dryRun === true && <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="font-bold">{t('products.importCounts', { total: importResult.totalRows, valid: importResult.validRows, invalid: importResult.invalidRows })}</p>
+                <div className="max-h-48 divide-y overflow-y-auto rounded-lg border bg-white">
+                  {importResult.rows?.map((row) => <div key={row.row} className={`flex items-start justify-between gap-3 p-2 ${row.valid ? '' : 'bg-red-50 text-red-800'}`}>
+                    <span>{t('products.csvRow', { row: row.row })}: {t('products.csvProductSummary', { name: row.data?.name || '—', sku: row.data?.sku || '—', category: row.data?.category || '—' })}</span>
+                    <span className="text-right text-[11px]">{row.valid ? t('products.valid') : (row.errors || []).map((error) => t(error.code === 'NOT_FOUND' && error.field === 'category' ? 'products.csvCategoryNotFound' : `errors.${error.code}`, { defaultValue: error.code })).join(', ')}</span>
+                  </div>)}
                 </div>
-              )}
+                {importResult.rows?.some((row) => Number(row.data?.openingQuantity) > 0) && !importBranchId && <p className="text-amber-800">{t('products.selectOpeningBranch')}</p>}
+              </div>}
+              {importResult?.dryRun === false && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800" role="status">{t('products.importComplete', { imported: importResult.imported, skipped: importResult.skipped })}</p>}
             </div>
 
             <div className="mt-6 flex justify-end gap-2 pt-3 border-t">
               <button
+                type="button"
                 onClick={() => setShowImportModal(false)}
                 className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
               >
                 {t('common.cancel')}
               </button>
-              {importValidation?.valid > 0 && (
+              {importResult?.dryRun === true && importResult.validRows > 0 && !importResult.rows?.some((row) => Number(row.data?.openingQuantity) > 0 && !importBranchId) && (
                 <button
+                  type="button"
                   onClick={confirmImport}
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  disabled={importBusy}
+                  className="rounded-xl bg-teal-700 px-5 py-2 text-xs font-bold text-white hover:bg-teal-800 disabled:opacity-50"
                 >
-                  {isAm ? 'ትክክለኛዎቹን አስመጣ' : `Import ${importValidation.valid} Products`}
+                  {t('products.confirmImport', { count: importResult.validRows })}
                 </button>
               )}
             </div>
