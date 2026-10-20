@@ -28,4 +28,5 @@ router.use('/purchase-orders', require('./modules/purchaseOrders/purchaseOrders.
 router.use('/transfers', require('./modules/transfers/transfers.routes'));
 router.use('/adjustments', require('./modules/adjustments/adjustments.routes'));
 router.use('/notifications', require('./modules/notifications/notifications.routes'));
+router.use('/settings', require('./modules/settings/settings.routes'));
 module.exports = router;
