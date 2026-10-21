@@ -689,8 +689,8 @@ Fields from Kidus: `id`, `userId`, `action`, `entityType`, `entityId`, `branchId
   "createdAt": "2026-10-05T09:30:00Z" }
 ```
 Entity types (K4): `USER`, `PRODUCT`, `SUPPLIER`, `BRANCH`, `PO`, `SALE`, `RETURN`, `ADJUSTMENT`, `TRANSFER`, `IMPORT`.
-Action names (K4): `USER_CREATED`, `USER_UPDATED`, `USER_LOGOUT`, `PRODUCT_CREATED`, `PRODUCT_UPDATED`, `PRICE_CHANGED`, `SUPPLIER_UPDATED`, `BRANCH_UPDATED`, `STOCK_MOVEMENT`, `PO_CREATED`, `PO_APPROVED`, `PO_RECEIVED`, `SALE_CREATED`, `RETURN_CREATED`, `RETURN_REFUNDED`, `ADJUSTMENT_CREATED`, `TRANSFER_REQUESTED`, `TRANSFER_APPROVED`, `TRANSFER_SHIPPED`, `TRANSFER_RECEIVED`, `IMPORT_CONFIRMED`.
-**Proposed additions (TBC Kidus, K-F).** These writes have no audit action today. Melat needs the final list to write translations.
+Action names (K4): `USER_CREATED`, `USER_UPDATED`, `USER_LOGOUT`, `PRODUCT_CREATED`, `PRODUCT_UPDATED`, `PRICE_CHANGED`, `SUPPLIER_UPDATED`, `BRANCH_UPDATED`, `PO_CREATED`, `PO_APPROVED`, `PO_REJECTED`, `PO_RECEIVED`, `SALE_CREATED`, `RETURN_CREATED`, `RETURN_REFUNDED`, `ADJUSTMENT_CREATED`, `TRANSFER_REQUESTED`, `TRANSFER_APPROVED`, `TRANSFER_REJECTED`, `TRANSFER_SHIPPED`, `TRANSFER_RECEIVED`, `IMPORT_CONFIRMED`.
+`PO_REJECTED` and `TRANSFER_REJECTED` are included (decided, K-F). `STOCK_MOVEMENT` is not an audit action, because stock movements already have their own history (6.3). Proposed additions (TBC Kidus): These writes have no audit action today. Melat needs the final list to write translations.
 
 | Write | Proposed action | Entity type |
 |---|---|---|
@@ -900,7 +900,7 @@ Errors: `400 VALIDATION_ERROR` (no file, unreadable file, missing `dryRun`, miss
 
 ## 13. What is still missing (open decisions)
 
-Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests.
+Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided).
 
 ### 13.1 Blocks Week 2 (answer these first)
 
@@ -921,7 +921,6 @@ Each open item below has a **default to build against (proposed)**. Work starts 
 | K-C | Default `minQuantity` for new stock rows. | `null` (no alert until someone sets it). Melat's badge already assumes this. |
 | K-D | Reject reason: is there a column on POs and transfers to store it? | Accept an optional `reason` on reject and keep it in the audit log `newValue`, so no new column is needed. It is not shown on the PO screen. If you prefer, drop it and Melat removes the reason box. |
 | K-E | How is rejection stored in your columns (`approvedBy/At`, or a rejected pair)? | The API shows `approvedBy/At` and `rejectedBy/At` as separate pairs and maps them from your columns. |
-| K-F | Audit names: add `PO_REJECTED`, `TRANSFER_REJECTED` and the additions proposed in 6.8? Keep `STOCK_MOVEMENT`, which has no matching entity type? | Add them all. Keep `STOCK_MOVEMENT`. **Melat needs the final list to write translations.** |
 | K-G (return part) | The return needs `reason`, `refundAmount`, `refundStatus`, `refundedBy` and `refundedAt`. | Add the columns before Week 3 starts. |
 | K-J | **New.** How is `poNumber` (`PO-000040`) made? | `PO-` plus the PO `id` padded to 6 digits. Gaps are fine for POs. No locked counter, unlike invoices (K3). |
 | K-K | **New.** Can a transfer be received with a different quantity than was shipped (damage on the road)? | No. The destination receives exactly what was shipped. A difference is fixed afterwards with an adjustment. Transfer items then have no `receivedQuantity`. |
@@ -953,7 +952,7 @@ Each open item below has a **default to build against (proposed)**. Work starts 
 
 ### 13.5 Waiting for the week they belong to
 - **Week 3:** Hemen's dashboard shapes and report filters (above); the CSV import template columns and the report CSV export approach (all rows, UTF-8 with BOM), which are proposed in sections 8 and 10 and are confirmed when the feature starts.
-- **Week 3 (Melat):** the final Amharic labels. These are text only and not part of this contract. Audit action translations wait for K-F.
+- **Week 3 (Melat):** the final Amharic labels. These are text only and not part of this contract. The audit action names are final (K-F decided).
 
 ### SRS changes that follow from these decisions (for Kidus's Week 4 SRS update, not the contract)
 - **FR-IMP-01:** change "Admin and Branch Manager" to "Admin".
