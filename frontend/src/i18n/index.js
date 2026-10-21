@@ -23,10 +23,12 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false }, // React already escapes
 })
 
-document.documentElement.lang = initial
+// The page language is only set in a browser (tests run without a document)
+const hasDocument = typeof document !== 'undefined'
+if (hasDocument) document.documentElement.lang = initial
 
 i18n.on('languageChanged', (lng) => {
-  document.documentElement.lang = lng
+  if (hasDocument) document.documentElement.lang = lng
   try {
     localStorage.setItem(STORAGE_KEY, lng)
   } catch {

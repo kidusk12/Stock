@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
 import { formatETB } from '../../lib/ethiopianDate'
 import {
-  Boxes,
   Search,
   Plus,
   FileSpreadsheet,
@@ -17,7 +16,6 @@ import {
 export default function ProductsList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
   const isAdmin = user?.role === 'ADMIN'
 
   const [products, setProducts] = useState([])
@@ -31,7 +29,6 @@ export default function ProductsList() {
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(1)
   const [pageError, setPageError] = useState('')
-  const [stockRows, setStockRows] = useState([])
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false)
@@ -73,7 +70,6 @@ export default function ProductsList() {
         api.get('/stock', { branchId: selectedBranchId || undefined, page: index + 2, limit: 100 })
       )) : []
       const rows = [...(initialStockResult.data || []), ...extraStockPages.flatMap((result) => result.data || [])]
-      setStockRows(rows)
       setTotal(productResult.total ?? productResult.data?.length ?? 0)
       setPageCount(Math.max(1, Math.ceil((productResult.total ?? 0) / (productResult.limit || 20))))
       setProducts((productResult.data || []).map((product) => {
@@ -96,6 +92,8 @@ export default function ProductsList() {
   }, [includeInactive, page, search, selectedBranchId, selectedCat, t])
 
   useEffect(() => {
+    // This effect starts an asynchronous API load; the resulting state updates happen after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts()
   }, [loadProducts])
 
@@ -227,7 +225,7 @@ export default function ProductsList() {
             {t('products.title')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {isAm ? 'የምርት ካታሎግ፣ ዋጋዎች እና የክምችት መጠን' : 'Product catalog, pricing, and branch stock on hand'}
+            {t('products.description')}
           </p>
         </div>
 
@@ -272,7 +270,7 @@ export default function ProductsList() {
             onChange={(e) => { setSelectedCat(e.target.value); setPage(1) }}
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:border-blue-500 focus:outline-none"
           >
-            <option value="">{isAm ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
+            <option value="">{t('products.allCategories')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -327,7 +325,7 @@ export default function ProductsList() {
                       {p.isLowStock && (
                         <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
                           <AlertTriangle className="h-3 w-3" />
-                          {isAm ? 'ዝቅተኛ' : 'Low'}
+                          {t('products.lowStock')}
                         </span>
                       )}
                     </td>
@@ -409,7 +407,7 @@ export default function ProductsList() {
                     <div className="font-semibold text-slate-800">{bs.branchName}</div>
                     <div className="flex items-center gap-4">
                       <span className="text-slate-500 text-[11px]">
-                        Min: {bs.minQuantity} | Max: {bs.maxQuantity}
+                        {t('stock.minimum')}: {bs.minQuantity} | {t('stock.maximum')}: {bs.maxQuantity}
                       </span>
                       <span className="font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">
                         {bs.quantity} {showBranchModal.unit}
@@ -459,7 +457,7 @@ export default function ProductsList() {
                     maxLength={150}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Sugar 50kg (ስኳር 50 ኪ.ግ)"
+                  placeholder={t('products.exampleName')}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -474,7 +472,7 @@ export default function ProductsList() {
                     maxLength={50}
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="e.g. SUG-50"
+                    placeholder={t('products.exampleSku')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -486,7 +484,7 @@ export default function ProductsList() {
                     maxLength={50}
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    placeholder="e.g. 6001001"
+                    placeholder={t('products.exampleBarcode')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -516,7 +514,8 @@ export default function ProductsList() {
                     required
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="bag, kg, piece, carton"
+                    maxLength={20}
+                    placeholder={t('products.exampleUnit')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>

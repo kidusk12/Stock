@@ -33,7 +33,11 @@ export default function SuppliersList() {
     }
   }, [includeInactive, query, t])
 
-  useEffect(() => { loadSuppliers() }, [loadSuppliers])
+  useEffect(() => {
+    // This effect starts an asynchronous API load; the resulting state updates happen after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSuppliers()
+  }, [loadSuppliers])
 
   const openCreate = () => {
     setEditingSupplier(null)
@@ -130,12 +134,12 @@ export default function SuppliersList() {
           <form onSubmit={handleSave} className="mt-5 space-y-4">
             {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</div>}
             <div><label htmlFor="supplier-name" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.name')} *</label><input id="supplier-name" required maxLength={150} autoFocus value={formData.name} onChange={(e) => setFormData((s) => ({ ...s, name: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
-            <div><label htmlFor="supplier-contact" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.contact')}</label><input id="supplier-contact" value={formData.contactName} onChange={(e) => setFormData((s) => ({ ...s, contactName: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
+            <div><label htmlFor="supplier-contact" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.contact')}</label><input id="supplier-contact" maxLength={150} value={formData.contactName} onChange={(e) => setFormData((s) => ({ ...s, contactName: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label htmlFor="supplier-phone" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.phone')}</label><input id="supplier-phone" type="tel" autoComplete="tel" value={formData.phone} onChange={(e) => setFormData((s) => ({ ...s, phone: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
-              <div><label htmlFor="supplier-tin" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.tin')}</label><input id="supplier-tin" maxLength={20} value={formData.tin} onChange={(e) => setFormData((s) => ({ ...s, tin: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
+              <div><label htmlFor="supplier-phone" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.phone')}</label><input id="supplier-phone" type="tel" autoComplete="tel" maxLength={30} value={formData.phone} onChange={(e) => setFormData((s) => ({ ...s, phone: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
+              <div><label htmlFor="supplier-tin" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.tin')}</label><input id="supplier-tin" maxLength={50} value={formData.tin} onChange={(e) => setFormData((s) => ({ ...s, tin: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
             </div>
-            <div><label htmlFor="supplier-address" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.address')}</label><input id="supplier-address" autoComplete="street-address" value={formData.address} onChange={(e) => setFormData((s) => ({ ...s, address: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
+            <div><label htmlFor="supplier-address" className="mb-1 block text-sm font-bold text-slate-700">{t('suppliers.address')}</label><input id="supplier-address" autoComplete="street-address" maxLength={255} value={formData.address} onChange={(e) => setFormData((s) => ({ ...s, address: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" /></div>
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setShowModal(false)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common.cancel')}</button>
               <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-50"><Save className="h-4 w-4" aria-hidden="true" />{submitting ? t('common.loading') : t('common.save')}</button></div>
           </form>

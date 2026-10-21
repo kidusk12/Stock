@@ -18,7 +18,6 @@ import {
 export default function SalesPos() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
 
   const [activeTab, setActiveTab] = useState('pos') // 'pos' or 'history'
   const [products, setProducts] = useState([])
@@ -202,7 +201,11 @@ export default function SalesPos() {
   const setCartItemQuantity = (productId, value) => {
     const quantity = Number(value)
     const item = cart.find((entry) => entry.productId === productId)
-    if (!item || !Number.isFinite(quantity) || quantity <= 0 || quantity > item.availableStock || !/^\d+(\.\d{1,2})?$/.test(String(value))) {
+    if (item && Number.isFinite(quantity) && quantity > item.availableStock) {
+      setSaleError(t('sales.exceedsStock', { available: item.availableStock }))
+      return
+    }
+    if (!item || !Number.isFinite(quantity) || quantity <= 0 || !/^\d+(\.\d{1,2})?$/.test(String(value))) {
       setSaleError(t('sales.invalidQuantity'))
       return
     }

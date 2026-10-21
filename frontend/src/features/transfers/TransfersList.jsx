@@ -149,8 +149,6 @@ export default function TransfersList() {
 
   const handleShip = (id) => withAction(id, 'ship', () => api.post(`/transfers/${id}/ship`))
 
-  const handleReceive = (id) => withAction(id, 'receive', () => api.post(`/transfers/${id}/receive`))
-
   const handleReject = async (event) => {
     event.preventDefault()
     if (!rejectTransfer) return
@@ -287,15 +285,13 @@ export default function TransfersList() {
                           )}
 
                           {trf.status === 'SHIPPED' && (user?.role === 'ADMIN' || Number(user?.branchId) === Number(trf.toBranchId)) && (
-                            <button
-                              type="button"
-                              disabled={Boolean(actionLoading)}
-                              onClick={() => handleReceive(trf.id)}
+                            <Link
+                              to={`/transfers/${trf.id}`}
                               className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
                             >
                               <CheckCircle2 className="h-3 w-3" />
-                              {t('transfers.confirmReceipt')}
-                            </button>
+                              {t('transfers.reviewReceipt')}
+                            </Link>
                           )}
 
                           {trf.status === 'RECEIVED' && (

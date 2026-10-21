@@ -25,7 +25,7 @@ export default function AdjustmentsList() {
   const [branchId, setBranchId] = useState('')
   const [productId, setProductId] = useState('')
   const [quantityChange, setQuantityChange] = useState('')
-  const [reason, setReason] = useState('DAMAGE')
+  const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -78,6 +78,10 @@ export default function AdjustmentsList() {
       setErrorMsg(t('adjustments.productRequired'))
       return
     }
+    if (!reason) {
+      setErrorMsg(t('adjustments.reasonRequired'))
+      return
+    }
     if (user?.role === 'ADMIN' && !branchId) {
       setErrorMsg(t('adjustments.branchRequired'))
       return
@@ -106,7 +110,7 @@ export default function AdjustmentsList() {
       setProductId('')
       setQuantityChange('')
       setNote('')
-      loadAdjustments(page)
+      loadAdjustments(1, appliedFilters)
     } catch (err) {
       setErrorMsg(err.code === 'INSUFFICIENT_STOCK'
         ? t('adjustments.insufficientStock')
@@ -129,7 +133,7 @@ export default function AdjustmentsList() {
 
         {user?.role !== 'AUDITOR' && (
           <button
-            onClick={() => { setShowModal(true); setErrorMsg(''); setBranchId(user?.role === 'ADMIN' ? String(selectedBranchId || '') : String(user?.branchId || '')); setReason('DAMAGE'); setNote(''); }}
+            onClick={() => { setShowModal(true); setErrorMsg(''); setBranchId(user?.role === 'ADMIN' ? String(selectedBranchId || '') : String(user?.branchId || '')); setReason(''); setNote(''); }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
           >
             <Plus className="h-4 w-4" />
@@ -262,15 +266,16 @@ export default function AdjustmentsList() {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">{t('adjustments.reason')} *</label>
                   <select
+                    required
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
+                    <option value="">{t('adjustments.selectReason')}</option>
                     <option value="DAMAGE">{t('adjustments.damage')}</option>
                     <option value="EXPIRY">{t('adjustments.expiry')}</option>
                     <option value="LOSS">{t('adjustments.loss')}</option>
                     <option value="RECOUNT">{t('adjustments.recount')}</option>
-                    <option value="OPENING_STOCK">{t('adjustments.openingStock')}</option>
                     <option value="OTHER">{t('adjustments.other')}</option>
                   </select>
                 </div>
@@ -283,7 +288,6 @@ export default function AdjustmentsList() {
                     type="number"
                     required
                     step="0.01"
-                    min={reason === 'OPENING_STOCK' ? '0.01' : undefined}
                     max={['DAMAGE', 'EXPIRY', 'LOSS'].includes(reason) ? '-0.01' : undefined}
                     value={quantityChange}
                     onChange={(e) => setQuantityChange(e.target.value)}
@@ -293,7 +297,7 @@ export default function AdjustmentsList() {
                 </div>
               </div>
 
-              <p className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">{['DAMAGE', 'EXPIRY', 'LOSS'].includes(reason) ? t('adjustments.negativeRequired') : reason === 'OPENING_STOCK' ? t('adjustments.positiveRequired') : t('adjustments.signedAllowed')}</p>
+              <p className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">{['DAMAGE', 'EXPIRY', 'LOSS'].includes(reason) ? t('adjustments.negativeRequired') : t('adjustments.signedAllowed')}</p>
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">{t('adjustments.notes')}</label>

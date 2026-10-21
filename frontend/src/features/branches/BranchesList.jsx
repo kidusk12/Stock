@@ -153,8 +153,8 @@ export default function BranchesList() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>
               <div>
-                <label htmlFor="branch-code" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.code')}</label>
-                <input id="branch-code" name="code" type="text" maxLength={30} autoCapitalize="characters" value={formData.code}
+                <label htmlFor="branch-code" className="mb-1 block text-sm font-bold text-slate-700">{t('branches.code')} *</label>
+                <input id="branch-code" name="code" type="text" required maxLength={20} autoCapitalize="characters" value={formData.code}
                   onChange={(e) => setFormData((s) => ({ ...s, code: e.target.value.toUpperCase() }))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100" />
               </div>

@@ -12,7 +12,6 @@ import {
 export default function ReturnsList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
 
   const [returns, setReturns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -28,7 +27,7 @@ export default function ReturnsList() {
   const [showModal, setShowModal] = useState(false)
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [foundSale, setFoundSale] = useState(null)
-  const [returnItems, setReturnItems] = useState({}) // productId -> qty
+  const [returnItems, setReturnItems] = useState({}) // saleItemId -> qty
   const [returnReason, setReturnReason] = useState('')
   const [returnError, setReturnError] = useState('')
   const [returnNotice, setReturnNotice] = useState('')
@@ -96,7 +95,7 @@ export default function ReturnsList() {
       const sale = await api.get(`/sales/${saleSummary.id}`)
       setFoundSale(sale)
       const init = {}
-      sale.items.forEach((item) => { init[item.productId] = '0' })
+      sale.items.forEach((item) => { init[item.id] = '0' })
       setReturnItems(init)
     } catch (err) {
       setReturnError(t(`errors.${err.code}`, { defaultValue: t('returns.invoiceLoadError') }))
@@ -113,8 +112,8 @@ export default function ReturnsList() {
     const itemsToSubmit = foundSale.items
       .map((saleItem) => {
         const remaining = Math.max(0, Number(saleItem.quantity) - Number(saleItem.returnedQuantity || 0))
-        const rawQuantity = returnItems[saleItem.productId] || '0'
-        return { productId: Number(saleItem.productId), quantity: Number(rawQuantity), remaining, rawQuantity }
+        const rawQuantity = returnItems[saleItem.id] || '0'
+        return { saleItemId: Number(saleItem.id), quantity: Number(rawQuantity), remaining, rawQuantity }
       })
       .filter((item) => item.quantity > 0)
 
@@ -131,7 +130,7 @@ export default function ReturnsList() {
     try {
       const createdReturn = await api.post(`/sales/${foundSale.id}/returns`, {
         reason: returnReason.trim() || undefined,
-        items: itemsToSubmit.map(({ productId, quantity }) => ({ productId, quantity })),
+        items: itemsToSubmit.map(({ saleItemId, quantity }) => ({ saleItemId, quantity })),
       })
       setReturnNotice(t('returns.createdNotice', { returnNumber: createdReturn.returnNumber }))
       setShowModal(false)
@@ -150,7 +149,7 @@ export default function ReturnsList() {
           setFoundSale(latestSale)
           setReturnItems((previous) => Object.fromEntries(latestSale.items.map((item) => {
             const remaining = Math.max(0, Number(item.quantity) - Number(item.returnedQuantity || 0))
-            return [item.productId, String(Math.min(Number(previous[item.productId] || 0), remaining))]
+            return [item.id, String(Math.min(Number(previous[item.id] || 0), remaining))]
           })))
         } catch {
           // Keep the current invoice visible; the next search will fetch its latest returnable quantities.
@@ -298,7 +297,7 @@ export default function ReturnsList() {
                         ) : (
                           <span className="text-slate-400 text-[11px] font-medium flex items-center justify-center gap-1">
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                            {isAm ? 'ተጠናቋል' : 'Done'}
+                            {t('returns.refunded')}
                           </span>
                         )}
                       </td>
@@ -373,7 +372,7 @@ export default function ReturnsList() {
                   {!hasReturnableItems && <p role="status" className="mb-2 rounded-lg bg-slate-50 p-2 text-slate-600">{t('returns.allItemsReturned')}</p>}
                   <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                     {foundSale.items.map((it) => (
-                      <div key={it.productId} className="p-3 flex items-center justify-between bg-white">
+                      <div key={it.id} className="p-3 flex items-center justify-between bg-white">
                         <div>
                           <p className="font-bold text-slate-800">{it.productName || it.name}</p>
                           <p className="text-[10px] text-slate-400">{t('returns.soldQuantity')}: {it.quantity} @ {formatETB(it.unitPrice, i18n.language)}</p>
@@ -386,10 +385,10 @@ export default function ReturnsList() {
                             min="0"
                             max={Math.max(0, Number(it.quantity) - Number(it.returnedQuantity || 0))}
                             step="0.01"
-                            value={returnItems[it.productId] ?? '0'}
+                            value={returnItems[it.id] ?? '0'}
                             disabled={Number(it.quantity) <= Number(it.returnedQuantity || 0)}
                             aria-label={t('returns.returnQuantityFor', { product: it.productName || it.name })}
-                            onChange={(e) => setReturnItems((previous) => ({ ...previous, [it.productId]: e.target.value }))}
+                            onChange={(e) => setReturnItems((previous) => ({ ...previous, [it.id]: e.target.value }))}
                             className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-center font-bold text-xs focus:border-blue-500 focus:outline-none"
                           />
                         </div>
