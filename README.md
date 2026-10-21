@@ -55,7 +55,7 @@ The frontend shows a placeholder page. The backend health check is at http://loc
 1. Only `backend/src/services/stockService.js` changes stock quantities.
 2. Permissions are enforced on the server, not just hidden in the UI.
 3. No hard-coded text in the UI. Use translation keys (`t('sales.total')`).
-4. The API contract (`docs/API_CONTRACT.md`) changes only by agreement.
+4. The API contract (`docs/api-contract.md`) changes only by agreement.
 
 ## Folder guide
 - `backend/src/modules/<feature>/` : each feature has `*.routes.js`, `*.controller.js`, `*.service.js`
