@@ -664,6 +664,7 @@ Same object as the POST response, plus company fields for printing and `returned
 { "branchId": 1, "productId": 12, "quantity": -3, "reason": "DAMAGE", "note": "Dropped in storage" }
 ```
 - `quantity` is signed: negative decreases stock, positive increases it. It cannot be 0.
+- **Sign rules (decided, N11):** `DAMAGE`, `EXPIRY` and `LOSS` must be negative (`rule: must_be_negative`); `RECOUNT` and `OTHER` may be either positive or negative.
 - `reason` is required: `DAMAGE`, `EXPIRY`, `LOSS`, `RECOUNT`, `OTHER`. `note` is optional.
 - There is no `OPENING_STOCK` adjustment reason (decided, K-K). Starting stock is loaded by the seed script as `OPENING_STOCK` movements.
 
@@ -903,7 +904,7 @@ Errors: `400 VALIDATION_ERROR` (no file, unreadable file, missing `dryRun`, miss
 
 ## 13. What is still missing (open decisions)
 
-Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided), K-K and N4 (no OPENING_STOCK adjustment reason), N2 (Auditor reads sales, POs, transfers).
+Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided), K-K and N4 (no OPENING_STOCK adjustment reason), N2 (Auditor reads sales, POs, transfers), N11 (adjustment sign rules).
 
 ### 13.1 Blocks Week 2 (answer these first)
 
