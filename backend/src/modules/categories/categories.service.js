@@ -3,7 +3,6 @@ const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { parsePagination } = require('../../utils/pagination');
 const { parseSort } = require('../../utils/sort');
-const { parseIdOr404 } = require('../../utils/params');
 
 const SORT_FIELDS = ['name', 'id'];
 const mapCategory = (r) => ({ id: r.id, name: r.name, isActive: r.isActive });
@@ -26,7 +25,6 @@ async function listCategories(query) {
 }
 
 async function getCategory(id) {
-  parseIdOr404(id, 'Category not found');
   const row = await prisma.category.findUnique({ where: { id } });
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Category not found');
   return mapCategory(row);
@@ -45,7 +43,6 @@ async function createCategory(body) {
 }
 
 async function updateCategory(id, body) {
-  parseIdOr404(id, 'Category not found');
   await getCategory(id);
   try {
     const row = await prisma.category.update({ where: { id }, data: body });

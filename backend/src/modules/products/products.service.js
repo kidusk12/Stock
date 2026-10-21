@@ -27,13 +27,6 @@ function mapProduct(row, user, quantity) {
   return out;
 }
 
-function parseIdOr404(id) {
-  if (!Number.isInteger(id) || id < 1) {
-    throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
-  }
-  return id;
-}
-
 // Which branch applies for quantities?
 //   Admin/Auditor: only when ?branchId= is passed
 //   Manager/Staff: always their own branch (must match; else 403)
@@ -113,7 +106,6 @@ async function listProducts(req) {
 }
 
 async function getProduct(req, id) {
-  parseIdOr404(id);
   const row = await prisma.product.findUnique({ where: { id }, include: { category: true } });
   if (!row) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
@@ -176,7 +168,6 @@ async function createProduct(data) {
 }
 
 async function updateProduct(id, data) {
-  parseIdOr404(id);
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 

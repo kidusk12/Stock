@@ -3,7 +3,6 @@ const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { parsePagination } = require('../../utils/pagination');
 const { parseSort } = require('../../utils/sort');
-const { parseIdOr404 } = require('../../utils/params');
 
 const SORT_FIELDS = ['name', 'id'];
 
@@ -40,7 +39,6 @@ async function listSuppliers(query) {
 }
 
 async function getSupplier(id) {
-  parseIdOr404(id, 'Supplier not found');
   const row = await prisma.supplier.findUnique({ where: { id } });
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Supplier not found');
   return mapSupplier(row);
@@ -53,7 +51,6 @@ async function createSupplier(data) {
 }
 
 async function updateSupplier(id, data) {
-  parseIdOr404(id, 'Supplier not found');
   await getSupplier(id);
   const row = await prisma.supplier.update({ where: { id }, data });
   return mapSupplier(row);

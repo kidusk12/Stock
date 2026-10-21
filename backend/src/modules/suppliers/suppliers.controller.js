@@ -1,19 +1,14 @@
 // backend/src/modules/suppliers/suppliers.controller.js
 const svc = require('./suppliers.service');
-const { AppError, asyncHandler } = require('../../middleware/errors');
-
-function parseIdOr404(raw) {
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1) throw new AppError(404, 'NOT_FOUND', 'Supplier not found');
-  return n;
-}
+const { asyncHandler } = require('../../middleware/errors');
+const { parseIdOr404 } = require('../../utils/params');
 
 exports.list = asyncHandler(async (req, res) => {
   res.json(await svc.listSuppliers(req.query));
 });
 
 exports.get = asyncHandler(async (req, res) => {
-  res.json(await svc.getSupplier(parseIdOr404(req.params.id)));
+  res.json(await svc.getSupplier(parseIdOr404(req.params.id, 'Supplier not found')));
 });
 
 exports.create = asyncHandler(async (req, res) => {
@@ -21,5 +16,5 @@ exports.create = asyncHandler(async (req, res) => {
 });
 
 exports.update = asyncHandler(async (req, res) => {
-  res.json(await svc.updateSupplier(parseIdOr404(req.params.id), req.body));
+  res.json(await svc.updateSupplier(parseIdOr404(req.params.id, 'Supplier not found'), req.body));
 });
