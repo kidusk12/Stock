@@ -449,3 +449,49 @@ test('GET /api/sales/:id returns the sale with returnedQuantity and the company 
   expect(unknown.body.error.code).toBe('NOT_FOUND');
   expect((await get(tokens.admin, '/api/sales/abc')).status).toBe(404);
 });
+
+test('Auditor read access on sales lists and detail across all branches (T2 / N2)', async () => {
+  // Create a sale in branch A and a sale in branch B
+  const saleA = await sell(tokens.admin, { branchId: ids.branchA, items: [{ productId: ids.p1, quantity: 1 }] });
+  expect(saleA.status).toBe(201);
+  const saleB = await sell(tokens.admin, { branchId: ids.branchB, items: [{ productId: ids.p1, quantity: 1 }] });
+  expect(saleB.status).toBe(201);
+
+  // Auditor GET /api/sales returns 200 and includes sales from both branches
+  const allSales = await get(tokens.auditor, '/api/sales?limit=100');
+  expect(allSales.status).toBe(200);
+  const returnedIds = allSales.body.data.map((s) => s.id);
+  expect(returnedIds).toContain(saleA.body.id);
+  expect(returnedIds).toContain(saleB.body.id);
+
+  // Auditor GET /api/sales?branchId=<A> returns only branch A
+  const branchASales = await get(tokens.auditor, `/api/sales?branchId=${ids.branchA}&limit=100`);
+  expect(branchASales.status).toBe(200);
+  branchASales.body.data.forEach((sale) => expect(sale.branchId).toBe(ids.branchA));
+  expect(branchASales.body.data.some((s) => s.id === saleA.body.id)).toBe(true);
+  expect(branchASales.body.data.some((s) => s.id === saleB.body.id)).toBe(false);
+
+  // Auditor GET /api/sales/:id returns 200 with company and returnedQuantity
+  const detail = await get(tokens.auditor, `/api/sales/${saleA.body.id}`);
+  expect(detail.status).toBe(200);
+  expect(detail.body).toHaveProperty('company');
+  expect(detail.body.items[0]).toHaveProperty('returnedQuantity');
+
+  // Auditor POST /api/sales still returns 403
+  const postRes = await sell(tokens.auditor, { branchId: ids.branchA, items: [{ productId: ids.p1, quantity: 1 }] });
+  expect(postRes.status).toBe(403);
+  expect(postRes.body.error.code).toBe('FORBIDDEN');
+
+  // Manager and Staff still see only their own branch, and get 403 for another branchId
+  const mgrOwn = await get(tokens.manager, '/api/sales');
+  expect(mgrOwn.status).toBe(200);
+  mgrOwn.body.data.forEach((s) => expect(s.branchId).toBe(ids.branchA));
+
+  const mgrOther = await get(tokens.manager, `/api/sales?branchId=${ids.branchB}`);
+  expect(mgrOther.status).toBe(403);
+  expect(mgrOther.body.error.code).toBe('FORBIDDEN');
+
+  const staffOther = await get(tokens.staff, `/api/sales?branchId=${ids.branchB}`);
+  expect(staffOther.status).toBe(403);
+  expect(staffOther.body.error.code).toBe('FORBIDDEN');
+});

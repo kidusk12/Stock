@@ -1,3 +1,4 @@
+const { Prisma } = require('@prisma/client');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { assertBranchAccess } = require('../../middleware/auth');
@@ -6,7 +7,10 @@ const { writeAudit, AUDIT_ACTIONS } = require('../../middleware/audit'); // shar
 const { applyMovement } = require('../../services/stockService'); // the only place stock changes
 const { parsePagination } = require('../../utils/pagination'); // shared pagination rule
 const { dateRangeFilter } = require('../../utils/dates'); // shared Ethiopia-day parser
-const { D, money } = require('../../utils/decimal'); // shared money helpers
+
+const D = (value) => new Prisma.Decimal(value);
+// Money: 2 decimals, rounded half up (contract 6.0, rule 3)
+const money = (decimal) => decimal.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 
 const saleInclude = {
   branch: { select: { name: true } },
