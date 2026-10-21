@@ -1,4 +1,3 @@
-const { Prisma } = require('@prisma/client');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { assertBranchAccess } = require('../../middleware/auth');
@@ -7,10 +6,7 @@ const { writeAudit, AUDIT_ACTIONS } = require('../../middleware/audit'); // shar
 const { applyMovement } = require('../../services/stockService'); // the only place stock changes
 const { parsePagination } = require('../../utils/pagination'); // shared pagination rule
 const { dateRangeFilter } = require('../../utils/dates'); // shared Ethiopia-day parser
-
-const D = (value) => new Prisma.Decimal(value);
-// Money: 2 decimals, rounded half up (contract 6.0, rule 3)
-const money = (decimal) => decimal.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+const { D, money } = require('../../utils/decimal'); // shared money helpers
 
 const saleInclude = {
   branch: { select: { name: true } },
@@ -242,7 +238,8 @@ async function listSales(user, query = {}) {
     const branchId = parseIntParam(query.branchId, 'branchId');
     assertBranchAccess(user, branchId); // Manager and Staff get 403 for another branch
     where.branchId = branchId;
-  } else if (user.role !== 'ADMIN') {
+  } else if (user.role !== 'ADMIN' && user.role !== 'AUDITOR') {
+    // Admin and Auditor see all branches; Manager and Staff default to their own
     where.branchId = user.branchId;
   }
   if (query.invoiceNumber) where.invoiceNumber = { contains: query.invoiceNumber, mode: 'insensitive' };

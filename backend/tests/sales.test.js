@@ -144,18 +144,28 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test('an anonymous user and the Auditor are blocked from every sales endpoint', async () => {
+test('anonymous users are blocked; Auditor can read but not write (T2)', async () => {
   const body = { items: [{ productId: ids.p1, quantity: 1 }] };
-  expect((await request(app).post('/api/sales').send(body)).status).toBe(401);
 
+  // No token → 401 on every method
+  expect((await request(app).post('/api/sales').send(body)).status).toBe(401);
+  expect((await request(app).get('/api/sales')).status).toBe(401);
+  expect((await request(app).get('/api/sales/1')).status).toBe(401);
+
+  // Auditor cannot write (T2 rule: POST → 403)
   const post = await request(app).post('/api/sales').set(bearer(tokens.auditor)).send(body);
   expect(post.status).toBe(403);
   expect(post.body.error.code).toBe('FORBIDDEN');
 
+  // Auditor CAN read (T2 rule: GET → 200)
   const list = await get(tokens.auditor, '/api/sales');
-  expect(list.status).toBe(403);
-  expect(list.body.error.code).toBe('FORBIDDEN');
-  expect((await get(tokens.auditor, '/api/sales/1')).status).toBe(403);
+  expect(list.status).toBe(200);
+  expect(list.body).toHaveProperty('data');
+
+  const detail = await get(tokens.auditor, `/api/sales/1`);
+  // Either 200 (found) or 404 (no sale with id 1 yet) — both prove Auditor is not blocked
+  expect([200, 404]).toContain(detail.status);
+  expect(detail.status).not.toBe(403);
 });
 
 test('creates a sale: server prices, tax included, stock taken, movement and audit entry written', async () => {
@@ -430,7 +440,9 @@ test('GET /api/sales/:id returns the sale with returnedQuantity and the company 
   const otherBranch = await get(tokens.managerb, url);
   expect(otherBranch.status).toBe(403);
   expect(otherBranch.body.error.code).toBe('FORBIDDEN');
-  expect((await get(tokens.auditor, url)).status).toBe(403);
+
+  // Auditor CAN read any branch's sale detail (T2)
+  expect((await get(tokens.auditor, url)).status).toBe(200);
 
   const unknown = await get(tokens.admin, '/api/sales/999999999');
   expect(unknown.status).toBe(404);

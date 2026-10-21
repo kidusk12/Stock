@@ -36,11 +36,12 @@ const checkBranch = (req, res, next) => {
 
 const router = express.Router();
 
-// Contract 6.6: Admin, Manager and Staff. The Auditor has no access to sales (T2).
-router.use(requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF'));
+// T2: Auditor can read (N2), but only Admin, Manager, and Staff can write.
+const canWrite = requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF');
+const canRead = requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF', 'AUDITOR');
 
-router.post('/', checkBranch, validate(createSchema), controller.createSale);
-router.get('/', controller.listSales);
-router.get('/:id', controller.getSale);
+router.post('/', canWrite, checkBranch, validate(createSchema), controller.createSale);
+router.get('/', canRead, controller.listSales);
+router.get('/:id', canRead, controller.getSale);
 
 module.exports = router;
