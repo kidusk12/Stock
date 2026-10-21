@@ -280,34 +280,63 @@ const approvePurchaseOrder = (user, idParam) => decide(user, idParam, 'APPROVED'
 // POST /api/purchase-orders/:id/reject   (optional body { reason })
 const rejectPurchaseOrder = (user, idParam, body) => decide(user, idParam, 'REJECTED', (body || {}).reason);
 
-// POST /api/purchase-orders/:id/receive   (no body: everything outstanding is received at once)
+// POST /api/purchase-orders/:id/receive   (optional items body for partial receiving)
 async function receivePurchaseOrder(user, idParam, body) {
   const po = await loadForAction(user, idParam);
-  if (body && body.items !== undefined) {
-    // Partial receiving is cut for now (contract 6.5)
-    throw validationError('Partial receiving is not available', 'items', 'invalid', 'this endpoint takes no body');
-  }
+  const requestedItems = body?.items;
 
   return prisma.$transaction(
     async (tx) => {
-      // 1. lock the PO row; only an APPROVED PO can be received
+      // Lock the PO so concurrent receive attempts cannot exceed any outstanding line.
       const row = await lockPO(tx, po.id);
-      if (row.status !== 'APPROVED') throw invalidStatus(row.status);
+      if (!['APPROVED', 'PARTIALLY_RECEIVED'].includes(row.status)) throw invalidStatus(row.status);
 
-      // 2. take every outstanding line into stock, sorted by productId (fixed locking order)
+      // Fixed ordering keeps stock-row lock acquisition deterministic.
       const items = await tx.purchaseOrderItem.findMany({
         where: { purchaseOrderId: po.id },
-        orderBy: { productId: 'asc' },
+        orderBy: [{ productId: 'asc' }, { id: 'asc' }],
       });
-      for (const item of items) {
+      const itemsById = new Map(items.map((item) => [item.id, item]));
+      let linesToReceive;
+      if (requestedItems === undefined) {
+        linesToReceive = items.map((item) => ({ item, quantity: item.orderedQty.minus(item.receivedQty) }))
+          .filter(({ quantity }) => quantity.gt(0));
+      } else {
+        linesToReceive = requestedItems.map((requested, index) => {
+          const item = itemsById.get(requested.itemId);
+          if (!item) {
+            throw validationError('Item does not belong to this purchase order', `items[${index}].itemId`, 'invalid', 'unknown purchase order item');
+          }
+          return { item, quantity: D(requested.quantity), inputIndex: index };
+        });
+      }
+
+      // Validate every line before writing any stock movement. The transaction also guarantees
+      // a later movement failure rolls all received quantities and audits back together.
+      const overReceived = linesToReceive.flatMap(({ item, quantity, inputIndex }) => {
         const outstanding = item.orderedQty.minus(item.receivedQty);
-        if (!outstanding.gt(0)) continue;
+        if (quantity.gt(outstanding)) {
+          return [{
+            field: `items[${inputIndex ?? items.findIndex((line) => line.id === item.id)}].quantity`,
+            itemId: item.id,
+            remaining: outstanding.toNumber(),
+            requested: quantity.toNumber(),
+          }];
+        }
+        return [];
+      });
+      if (overReceived.length) {
+        throw new AppError(422, 'OVER_RECEIVE', 'Received quantity exceeds the remaining quantity on one or more purchase order lines.', overReceived);
+      }
+
+      for (const { item, quantity } of linesToReceive) {
+        if (!quantity.gt(0)) continue;
 
         await applyMovement(
           {
             productId: item.productId,
             branchId: po.branchId,
-            quantity: outstanding.toFixed(2),
+            quantity: quantity.toFixed(2),
             type: 'PURCHASE_RECEIPT',
             referenceType: 'PURCHASE_ORDER',
             referenceId: po.id,
@@ -315,13 +344,19 @@ async function receivePurchaseOrder(user, idParam, body) {
           },
           tx
         );
-        await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: item.orderedQty } });
+        await tx.purchaseOrderItem.update({
+          where: { id: item.id },
+          data: { receivedQty: item.receivedQty.plus(quantity) },
+        });
       }
 
-      // 3. the PO is RECEIVED. The product's costPrice is never changed here (N10).
+      const updatedItems = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: po.id } });
+      const complete = updatedItems.every((item) => item.receivedQty.gte(item.orderedQty));
+      const newStatus = complete ? 'RECEIVED' : 'PARTIALLY_RECEIVED';
+      // Product costPrice remains unchanged on receipt (contract 6.5).
       const updated = await tx.purchaseOrder.update({
         where: { id: po.id },
-        data: { status: 'RECEIVED' },
+        data: { status: newStatus },
         include: poInclude,
       });
 
@@ -332,8 +367,11 @@ async function receivePurchaseOrder(user, idParam, body) {
           entityType: 'PO',
           entityId: po.id,
           branchId: po.branchId,
-          oldValue: { status: 'APPROVED' },
-          newValue: { status: 'RECEIVED' },
+          oldValue: { status: row.status },
+          newValue: {
+            status: newStatus,
+            items: linesToReceive.map(({ item, quantity }) => ({ itemId: item.id, quantityReceived: quantity.toNumber() })),
+          },
         },
         tx
       );

@@ -21,7 +21,7 @@ const transferInclude = {
   rejectedBy: { select: { id: true, fullName: true } },
   shippedBy: { select: { id: true, fullName: true } },
   receivedBy: { select: { id: true, fullName: true } },
-  items: { orderBy: { id: 'asc' }, include: { product: { select: { name: true } } } },
+  items: { orderBy: { id: 'asc' }, include: { product: { select: { name: true, sku: true } } } },
 };
 
 const userRef = (user) => (user ? { id: user.id, name: user.fullName } : null);
@@ -30,6 +30,7 @@ const userRef = (user) => (user ? { id: user.id, name: user.fullName } : null);
 function toTransfer(t) {
   return {
     id: t.id,
+    transferNumber: `TRF-${String(t.id).padStart(6, '0')}`,
     fromBranchId: t.fromBranchId,
     fromBranchName: t.fromBranch.name,
     toBranchId: t.toBranchId,
@@ -39,7 +40,12 @@ function toTransfer(t) {
     items: t.items.map((i) => ({
       productId: i.productId,
       productName: i.product.name,
+      sku: i.product.sku,
       quantity: i.quantity.toNumber(),
+      ...(i.receivedQuantity != null ? {
+        receivedQuantity: i.receivedQuantity.toNumber(),
+        discrepancyQuantity: i.receivedQuantity.minus(i.quantity).toNumber(),
+      } : {}),
     })),
     requestedBy: userRef(t.requestedBy),
     requestedAt: t.createdAt,
@@ -242,7 +248,7 @@ const ACTIONS = {
   receive: { status: 'SHIPPED', side: 'destination' },
 };
 
-async function runAction(user, idParam, action, reasonInput) {
+async function runAction(user, idParam, action, actionInput) {
   const spec = ACTIONS[action];
 
   const id = parseIdOr404(idParam, 'Transfer not found');
@@ -256,7 +262,7 @@ async function runAction(user, idParam, action, reasonInput) {
   const actingBranchId = spec.side === 'source' ? transfer.fromBranchId : transfer.toBranchId;
   assertBranchAccess(user, actingBranchId);
 
-  const reason = action === 'reject' ? cleanReason(reasonInput) : null;
+  const reason = action === 'reject' ? cleanReason(actionInput?.reason) : null;
 
   return prisma.$transaction(
     async (tx) => {
@@ -341,24 +347,54 @@ async function runAction(user, idParam, action, reasonInput) {
           auditAction = AUDIT_ACTIONS.TRANSFER_SHIPPED;
           newValue = { status: 'SHIPPED' };
         } else {
+          const receivedItems = actionInput?.items;
+          const receivedByProduct = new Map();
+          if (receivedItems) {
+            receivedItems.forEach((received, index) => {
+              if (receivedByProduct.has(received.productId)) {
+                throw validationError('A product appears more than once', `items[${index}].productId`, 'duplicate', 'each product may appear once');
+              }
+              if (!items.some((item) => item.productId === received.productId)) {
+                throw validationError('Product is not in this transfer', `items[${index}].productId`, 'invalid', 'product must be part of the transfer');
+              }
+              receivedByProduct.set(received.productId, D(received.quantity));
+            });
+            if (receivedByProduct.size !== items.length) {
+              throw validationError('Received quantities are required for every transfer item', 'items', 'invalid', 'include each product in the transfer');
+            }
+          }
+
+          const receiptDetails = [];
           for (const { item } of sorted) {
-            await applyMovement(
-              {
-                productId: item.productId,
-                branchId: transfer.toBranchId,
-                quantity: item.quantity.toFixed(2),
-                type: 'TRANSFER_IN',
-                referenceType: 'TRANSFER',
-                referenceId: id,
-                userId: user.userId,
-              },
-              tx
-            );
+            const receivedQuantity = receivedByProduct.get(item.productId) || item.quantity;
+            const discrepancyQuantity = receivedQuantity.minus(item.quantity);
+            await tx.transferItem.update({ where: { id: item.id }, data: { receivedQuantity } });
+            receiptDetails.push({
+              productId: item.productId,
+              shippedQuantity: item.quantity.toNumber(),
+              receivedQuantity: receivedQuantity.toNumber(),
+              discrepancyQuantity: discrepancyQuantity.toNumber(),
+            });
+            if (receivedQuantity.gt(0)) {
+              await applyMovement(
+                {
+                  productId: item.productId,
+                  branchId: transfer.toBranchId,
+                  quantity: receivedQuantity.toFixed(2),
+                  type: 'TRANSFER_IN',
+                  reason: discrepancyQuantity.isZero() ? null : `Receipt discrepancy: shipped ${item.quantity.toFixed(2)}, received ${receivedQuantity.toFixed(2)}`,
+                  referenceType: 'TRANSFER',
+                  referenceId: id,
+                  userId: user.userId,
+                },
+                tx
+              );
+            }
           }
 
           data = { status: 'RECEIVED', receivedById: user.userId, receivedAt: now };
           auditAction = AUDIT_ACTIONS.TRANSFER_RECEIVED;
-          newValue = { status: 'RECEIVED' };
+          newValue = { status: 'RECEIVED', items: receiptDetails };
         }
       }
 
@@ -383,9 +419,9 @@ async function runAction(user, idParam, action, reasonInput) {
 }
 
 const approveTransfer = (user, idParam) => runAction(user, idParam, 'approve');
-const rejectTransfer = (user, idParam, body) => runAction(user, idParam, 'reject', (body || {}).reason);
+const rejectTransfer = (user, idParam, body) => runAction(user, idParam, 'reject', body || {});
 const shipTransfer = (user, idParam) => runAction(user, idParam, 'ship');
-const receiveTransfer = (user, idParam) => runAction(user, idParam, 'receive');
+const receiveTransfer = (user, idParam, body) => runAction(user, idParam, 'receive', body || {});
 
 module.exports = {
   createTransfer,

@@ -185,7 +185,7 @@ async function listLowStock(user, query = {}) {
     where,
     include: {
       branch: { select: { name: true } },
-      product: { select: { id: true, name: true } },
+      product: { select: { id: true, name: true, sku: true } },
     },
   });
 
@@ -202,6 +202,7 @@ async function listLowStock(user, query = {}) {
         branchName: row.branch.name,
         productId: row.productId,
         productName: row.product.name,
+        sku: row.product.sku,
         quantity,
         minQuantity,
         maxQuantity,

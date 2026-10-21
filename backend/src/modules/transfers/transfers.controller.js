@@ -35,7 +35,7 @@ const ship = asyncHandler(async (req, res) => {
 });
 
 const receive = asyncHandler(async (req, res) => {
-  const transfer = await transferService.receiveTransfer(req.user, req.params.id);
+  const transfer = await transferService.receiveTransfer(req.user, req.params.id, req.body);
   res.json(transfer);
 });
 

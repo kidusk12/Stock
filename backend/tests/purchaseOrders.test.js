@@ -584,15 +584,82 @@ async function createUser(username, role, branchId) {
       expect(response.body.error.code).toBe('INVALID_STATUS');
     });
 
-    test('rejects partial receiving payloads', async () => {
-      const po = await createPendingPO();
+    test('partially receives per-line quantities, then completes the remaining quantities', async () => {
+      const created = await createPO(managerToken, {
+        items: [
+          { productId: product.id, quantity: 10, unitCost: 25 },
+          { productId: productB.id, quantity: 5, unitCost: 15 },
+        ],
+      });
+      expect(created.status).toBe(201);
+      const po = created.body;
       await approvePO(adminToken, po.id);
 
+      const firstReceipt = await receivePO(managerToken, po.id, {
+        items: [
+          { itemId: po.items[0].id, quantity: 4 },
+          { itemId: po.items[1].id, quantity: 2 },
+        ],
+      });
+      expect(firstReceipt.status).toBe(200);
+      expect(firstReceipt.body.status).toBe('PARTIALLY_RECEIVED');
+      expect(firstReceipt.body.items.map((item) => item.receivedQuantity)).toEqual([4, 2]);
+      const partialStockA = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: product.id, branchId: branchA.id } } });
+      const partialStockB = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: productB.id, branchId: branchA.id } } });
+      expect(partialStockA.quantity.toNumber()).toBe(4);
+      expect(partialStockB.quantity.toNumber()).toBe(2);
+
+      const secondReceipt = await receivePO(managerToken, po.id, {
+        items: [
+          { itemId: po.items[0].id, quantity: 6 },
+          { itemId: po.items[1].id, quantity: 3 },
+        ],
+      });
+      expect(secondReceipt.status).toBe(200);
+      expect(secondReceipt.body.status).toBe('RECEIVED');
+      expect(secondReceipt.body.items.map((item) => item.receivedQuantity)).toEqual([10, 5]);
+      const completedStockA = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: product.id, branchId: branchA.id } } });
+      const completedStockB = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: productB.id, branchId: branchA.id } } });
+      expect(completedStockA.quantity.toNumber()).toBe(10);
+      expect(completedStockB.quantity.toNumber()).toBe(5);
+
+      const movements = await prisma.stockMovement.findMany({
+        where: { referenceType: 'PURCHASE_ORDER', referenceId: po.id },
+        orderBy: { productId: 'asc' },
+      });
+      expect(movements.map((movement) => movement.quantityChange.toNumber())).toEqual([4, 6, 2, 3]);
+      const audit = await prisma.auditLog.findMany({ where: { entityType: 'PO', entityId: po.id, action: 'PO_RECEIVED' }, orderBy: { id: 'asc' } });
+      expect(audit).toHaveLength(2);
+      expect(audit[0].newValue.status).toBe('PARTIALLY_RECEIVED');
+      expect(audit[1].newValue.status).toBe('RECEIVED');
+    });
+
+    test('returns OVER_RECEIVE with itemId, remaining and requested, without changing stock', async () => {
+      const po = await createPendingPO();
+      await approvePO(adminToken, po.id);
+      const stockBefore = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: product.id, branchId: branchA.id } } });
+      const quantityBefore = stockBefore ? stockBefore.quantity.toNumber() : 0;
+      const firstReceipt = await receivePO(managerToken, po.id, {
+        items: [{ itemId: po.items[0].id, quantity: 4 }],
+      });
+      expect(firstReceipt.body.status).toBe('PARTIALLY_RECEIVED');
+
       const response = await receivePO(managerToken, po.id, {
-        items: [{ productId: product.id, quantity: 1 }],
+        items: [{ itemId: po.items[0].id, quantity: 7 }],
       });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
+      expect(response.body.error.code).toBe('OVER_RECEIVE');
+      expect(response.body.error.details).toEqual([{
+        field: 'items[0].quantity',
+        itemId: po.items[0].id,
+        remaining: 6,
+        requested: 7,
+      }]);
+      const stock = await prisma.branchStock.findUnique({ where: { productId_branchId: { productId: product.id, branchId: branchA.id } } });
+      expect(stock.quantity.toNumber()).toBe(quantityBefore + 4);
+      expect(await prisma.stockMovement.count({ where: { referenceType: 'PURCHASE_ORDER', referenceId: po.id } })).toBe(1);
+      expect((await prisma.purchaseOrder.findUnique({ where: { id: po.id } })).status).toBe('PARTIALLY_RECEIVED');
     });
 
     test('allows Staff to receive an approved PO for their branch', async () => {

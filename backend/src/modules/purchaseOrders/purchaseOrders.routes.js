@@ -49,6 +49,21 @@ const rejectSchema = z
   })
   .optional();
 
+const receiveQuantity = z.number().positive().max(9999999999.99).refine(
+  (value) => Math.round(value * 100) / 100 === value,
+  { message: 'at most 2 decimal places' }
+);
+const receiveSchema = z.object({
+  items: z.array(z.object({ itemId: z.number().int().positive(), quantity: receiveQuantity })).min(1)
+    .superRefine((items, ctx) => {
+      const seen = new Set();
+      items.forEach((item, index) => {
+        if (seen.has(item.itemId)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, 'itemId'], message: 'itemId must appear only once' });
+        seen.add(item.itemId);
+      });
+    }).optional(),
+}).strict().optional();
+
 const router = express.Router();
 
 // For create: branch authorization must run before request validation.
@@ -125,11 +140,12 @@ router.post(
   controller.reject
 );
 
-// Receive: Admin, Manager and Staff. Partial receiving is not supported.
+// Receive: Admin, Manager and Staff. The optional items body receives selected lines/quantities.
 router.post(
   '/:id/receive',
   requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF'),
   checkPOBranch,
+  validate(receiveSchema),
   controller.receive
 );
 

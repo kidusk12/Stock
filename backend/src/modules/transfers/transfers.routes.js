@@ -25,6 +25,14 @@ const createSchema = z.object({
     .min(1), // the same product twice is checked in the service (rule duplicate)
 });
 
+const receiveQuantity = z.number()
+  .min(0)
+  .max(9999999999.99)
+  .refine((value) => Math.round(value * 100) / 100 === value, { message: 'at most 2 decimal places' });
+const receiveSchema = z.object({
+  items: z.array(z.object({ productId: z.number().int().positive(), quantity: receiveQuantity })).min(1).optional(),
+});
+
 // Contract 6.0, rule 1: authenticate, Auditor block, role, BRANCH, then validation.
 // For a request, Manager and Staff may only ask for stock for their OWN branch (toBranchId).
 // This runs before validate(), so another branch with a bad body is still 403, not 400.
@@ -57,6 +65,7 @@ router.post('/:id/reject', requireRole('ADMIN', 'BRANCH_MANAGER'), controller.re
 // Ship (source branch) and receive (destination branch): Admin, Manager and Staff.
 // The service checks that the user belongs to the right branch for that step.
 router.post('/:id/ship', canWrite, controller.ship);
-router.post('/:id/receive', canWrite, controller.receive);
+router.post('/:id/receive', canWrite, validate(receiveSchema), controller.receive);
 
 module.exports = router;
+module.exports.receiveSchema = receiveSchema;
