@@ -242,7 +242,8 @@ async function listSales(user, query = {}) {
     const branchId = parseIntParam(query.branchId, 'branchId');
     assertBranchAccess(user, branchId); // Manager and Staff get 403 for another branch
     where.branchId = branchId;
-  } else if (user.role !== 'ADMIN') {
+  } else if (user.role !== 'ADMIN' && user.role !== 'AUDITOR') {
+    // Admin and Auditor see all branches; Manager and Staff default to their own
     where.branchId = user.branchId;
   }
   if (query.invoiceNumber) where.invoiceNumber = { contains: query.invoiceNumber, mode: 'insensitive' };
