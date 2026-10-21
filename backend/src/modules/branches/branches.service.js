@@ -4,6 +4,7 @@ const { AppError } = require('../../middleware/errors');
 const { parsePagination } = require('../../utils/pagination');
 const { parseSort } = require('../../utils/sort');
 const { createStockRowsForBranch } = require('../../services/stockService');
+const { parseIdOr404 } = require('../../utils/params');
 
 const SORT_FIELDS = ['name', 'code', 'id'];
 
@@ -15,13 +16,6 @@ const mapBranch = (r) => ({
   phone: r.phone,
   isActive: r.isActive,
 });
-
-function parseIdOr404(id) {
-  if (!Number.isInteger(id) || id < 1) {
-    throw new AppError(404, 'NOT_FOUND', 'Branch not found');
-  }
-  return id;
-}
 
 async function listBranches(query) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 100 });
@@ -46,7 +40,7 @@ async function listBranches(query) {
 }
 
 async function getBranch(id) {
-  parseIdOr404(id);
+  parseIdOr404(id, 'Branch not found');
   const row = await prisma.branch.findUnique({ where: { id } });
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
   return mapBranch(row);
@@ -76,7 +70,7 @@ async function createBranch(data) {
 }
 
 async function updateBranch(id, data) {
-  parseIdOr404(id);
+  parseIdOr404(id, 'Branch not found');
   await getBranch(id);
   try {
     const row = await prisma.branch.update({ where: { id }, data });

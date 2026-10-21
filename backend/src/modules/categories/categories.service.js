@@ -3,17 +3,10 @@ const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
 const { parsePagination } = require('../../utils/pagination');
 const { parseSort } = require('../../utils/sort');
+const { parseIdOr404 } = require('../../utils/params');
 
 const SORT_FIELDS = ['name', 'id'];
 const mapCategory = (r) => ({ id: r.id, name: r.name, isActive: r.isActive });
-
-// A bad id in the URL (abc, 0, negative, NaN) is a 404, not a 500.
-function parseIdOr404(id) {
-  if (!Number.isInteger(id) || id < 1) {
-    throw new AppError(404, 'NOT_FOUND', 'Category not found');
-  }
-  return id;
-}
 
 async function listCategories(query) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 100 });
@@ -33,7 +26,7 @@ async function listCategories(query) {
 }
 
 async function getCategory(id) {
-  parseIdOr404(id);
+  parseIdOr404(id, 'Category not found');
   const row = await prisma.category.findUnique({ where: { id } });
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Category not found');
   return mapCategory(row);
@@ -52,7 +45,7 @@ async function createCategory(body) {
 }
 
 async function updateCategory(id, body) {
-  parseIdOr404(id);
+  parseIdOr404(id, 'Category not found');
   await getCategory(id);
   try {
     const row = await prisma.category.update({ where: { id }, data: body });

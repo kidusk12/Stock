@@ -1,8 +1,6 @@
-const { Prisma } = require('@prisma/client');
 const prisma = require('../../config/db');
 const { AppError } = require('../../middleware/errors');
-
-const D = (value) => new Prisma.Decimal(value);
+const { D } = require('../../utils/decimal');
 
 // K-H: the default rates have no stored place yet, so they are defined here. Read only.
 const DEFAULT_TAX_RATES = Object.freeze({ VAT: 15, TOT: 2 });
