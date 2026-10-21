@@ -1,6 +1,6 @@
 # API Contract: Multi-Branch Stock Management System (Version 6)
 
-**Owner:** Makda (Backend API) | **Version:** v0.6 DRAFT | **Date:** 21 October 2026
+**Owner:** Makda (Backend API) | **Version:** v0.6.1 DRAFT | **Date:** 21 October 2026
 **Source:** SRS (October 2026), Team Plan, Kidus's decisions K1-K7, the review comments on v0.1, the Team Decisions T1-T9 (Kidus, team lead), and the answers from Melat (M1, M2) and Hemen (H1-H6 and his three requests), a gap review of v0.4 (section 13), and the team's Users rule (who can be created, and the seeded Admin account).
 Items marked **(proposed)** are my suggestions where nothing has been decided. Items marked **(TBC)** need an answer from the named person.
 
@@ -24,6 +24,13 @@ Everything from v0.2 to v0.5 stays (see the change log in section 12), including
 | 6 | **Proposed (TBC Kidus, N13):** the exact errors, no password reset of the Admin account through the Users endpoint, and an audit action for a password change (6.8). | Follow-up |
 
 No new error code is needed. The rule uses the existing `VALIDATION_ERROR` and `FORBIDDEN`.
+
+### 0.1 What changed in v0.6.1
+- **K-F decided:** Finalized audit action names (added `PO_REJECTED`, `TRANSFER_REJECTED`; removed `STOCK_MOVEMENT`).
+- **K-K decided:** Removed `OPENING_STOCK` from adjustment reasons; starting stock is handled by the seed script.
+- **N2 decided:** Auditor has read-only access to sales lists, sales invoices, purchase orders, and transfers across all branches.
+- **N11 decided:** Adjustment sign rules documented (`DAMAGE`, `EXPIRY`, `LOSS` must be negative).
+- **6.9 text:** Transfer direction/branchId filtering rules and action check order aligned with code implementation.
 
 ---
 
@@ -900,6 +907,7 @@ Errors: `400 VALIDATION_ERROR` (no file, unreadable file, missing `dryRun`, miss
 | v0.4 | 10 Oct 2026 | Melat's answers (M1 screen needs, M2 status labels) and Hemen's answers (H1 to H6 and three requests) applied (see section 0). Error `details` with numbers, response shapes, names and `itemCount`, sorting rules, `entityId` filter, `defaultTaxRates`, `pendingRefunds`. | Pending: Kidus (data fields). Hemen and Melat answered their items in v0.4. |
 | v0.5 | 15 Oct 2026 | Gap review of v0.4 against Team Decisions T1-T9 (nothing dropped). New section 14 (Week 2 work plan), section 13 rewritten with defaults to build against, new questions K-J to K-M and N9 to N12, new section 1.10, low-stock rule completed, audit additions proposed, stale audit example fixed. | Pending: Kidus (data fields), Hemen, Melat. Week 2 lock not yet confirmed. |
 | v0.6 | 21 Oct 2026 | Users rule applied (section 4, new 4.1, row in 1.6): only Branch Manager, Staff and Auditor can be created; the seeded Admin cannot be created, reassigned or deactivated, its name can be edited, handover is a password change in Profile. New item N13, new proposed audit action `USER_PASSWORD_CHANGED`, seed note and tests updated. The Users page, mock API and SRS already follow the rule. | Pending: Kidus (N13, server enforcement). Week 2 lock still not confirmed. |
+| v0.6.1 | 21 Oct 2026 | Decided items applied: K-F (audit actions PO_REJECTED, TRANSFER_REJECTED), K-K (no OPENING_STOCK adjustment reason), N2 (Auditor reads sales, POs, transfers), N11 (adjustment sign rules), and 6.9 transfer filters and check order aligned with code. | Team decisions |
 
 ---
 
