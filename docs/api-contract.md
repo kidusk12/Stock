@@ -747,14 +747,15 @@ Errors: `400` (same branch, quantity below 1), `403`, `404`.
 
 #### GET /api/transfers
 **Who:** A and U (all branches, U read-only), M and S (own branch, as source or destination) (decided, N2).
-Query: `?status=`, `?direction=incoming|outgoing` (relative to the user's branch), `?branchId=`, `?from=`, `?to=`, `?page`, `?limit`. Manager and Staff see transfers where their branch is source or destination. The list leaves out `items` and adds `itemCount`; `GET /api/transfers/:id` returns the items.
+Query: `?status=`, `?direction=incoming|outgoing` (relative to the user's branch), `?branchId=`, `?from=`, `?to=`, `?page`, `?limit`. Manager and Staff see transfers where their branch is source or destination. Admin and Auditor who send `?direction=` without `?branchId=` have no branch to compare to, so the direction is ignored and every transfer is returned. `?branchId=` is accepted for Admin and Auditor; Manager and Staff get `403 FORBIDDEN` for a branch that is not theirs. The list leaves out `items` and adds `itemCount`; `GET /api/transfers/:id` returns the items.
 #### GET /api/transfers/:id
 **Who:** A and U (all branches, U read-only), M and S (own branch, as source or destination) (decided, N2).
 Success (200): the transfer object.
 
 #### Action endpoints (approve, reject, ship, receive)
+Order of checks: load (404), branch rule (403), input (400), then lock and check the status (409), then do the work.
 Request body: empty, except reject, which accepts `{ "reason": "..." }` **(TBC Kidus: needs a column to store it)**. Success (200): the updated transfer.
-Errors: `403`, `404`, `409 INVALID_STATUS`, `422 INSUFFICIENT_STOCK` (ship only).
+Errors: `400`, `403`, `404`, `409 INVALID_STATUS`, `422 INSUFFICIENT_STOCK` (ship only).
 Stock changes use `applyMovement` in one transaction. A low-stock notification is created after shipping if the source drops to or below its minimum.
 
 ---
