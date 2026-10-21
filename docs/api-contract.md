@@ -124,7 +124,7 @@ No new error code is needed. The rule uses the existing `VALIDATION_ERROR` and `
 | Create purchase order | Yes | Yes | Yes | No |
 | Approve / reject purchase order | Yes | Own | No | No |
 | Receive goods | Yes | Yes | Yes | No |
-| Sales and invoices | Yes | Yes | Yes | No |
+| Sales and invoices | Yes | Yes | Yes | All, read-only (N2) |
 | Customer returns (create) | Yes | Yes | Yes | No |
 | Mark a return as refunded | Yes | Yes | Yes | No |
 | Stock adjustments (create) | Yes | Yes | Yes | No |
@@ -139,7 +139,7 @@ No new error code is needed. The rule uses the existing `VALIDATION_ERROR` and `
 
 **Not covered by the team table. I applied these proposals and listed them in section 13 for confirmation:**
 - **Reading reference data** (branches, categories, products): all roles, because forms, filters and the sales screen need it. Reading suppliers: A, M, S, because Staff pick a supplier when they create a PO.
-- **Viewing purchase orders, transfers, returns, and the sales list and invoices:** A (all), M (own), S (own). The Auditor gets no access, matching the "No" for sales and invoices.
+- **Viewing purchase orders, transfers and the sales list and invoices:** A (all), M and S (own branch), **U (all branches, read-only)** (decided, N2). Returns: decide when Week 3 starts.
 - **Notifications and the low-stock page** follow the row "Low-stock notifications": A, M (own).
 
 ### 1.7 Stock service (Kidus)
@@ -223,15 +223,15 @@ These rules were missing in v0.4. They apply to every endpoint that creates a do
 | 19 | GET | `/api/stock/consolidated` | A, U | 2 |
 | 20 | PUT | `/api/stock/:branchId/:productId/thresholds` | A, M own | 2 |
 | 21 | GET | `/api/stock-movements` | A, M own, S own, U all | 2 |
-| 22 | GET, POST | `/api/purchase-orders` | GET A, M own, S own (p), POST A, M, S | 2 |
-| 23 | GET | `/api/purchase-orders/:id` | A, M own, S own (p) | 2 |
+| 22 | GET, POST | `/api/purchase-orders` | GET: A, M own, S own, U all; POST: A, M, S | 2 |
+| 23 | GET | `/api/purchase-orders/:id` | A, M own, S own, U all | 2 |
 | 24 | POST | `/api/purchase-orders/:id/approve`, `/reject` | A, M own | 2 |
 | 25 | POST | `/api/purchase-orders/:id/receive` | A, M, S | 2 |
-| 26 | GET, POST | `/api/sales` | A, M, S | 2 |
-| 27 | GET | `/api/sales/:id` (invoice) | A, M, S | 2 |
+| 26 | GET, POST | `/api/sales` | GET: A, M own, S own, U all; POST: A, M, S | 2 |
+| 27 | GET | `/api/sales/:id` (invoice) | A, M own, S own, U all | 2 |
 | 28 | GET, POST | `/api/adjustments` | GET A, M own, S own, U all; POST A, M, S | 2 |
-| 29 | GET, POST | `/api/transfers` | GET A, M own, S own (p); POST A, M, S (destination) | 2 |
-| 30 | GET | `/api/transfers/:id` | A, M own, S own (p) | 2 |
+| 29 | GET, POST | `/api/transfers` | GET: A, M own, S own, U all; POST: A, M, S (destination) | 2 |
+| 30 | GET | `/api/transfers/:id` | A, M own, S own, U all | 2 |
 | 31 | POST | `/api/transfers/:id/approve`, `/reject` | A, M (source) | 2 |
 | 32 | POST | `/api/transfers/:id/ship` (source), `/receive` (destination) | A, M, S | 2 |
 | 33 | GET | `/api/notifications` | A, M own | 2 |
@@ -574,9 +574,10 @@ Success (201): the PO object.
 Errors: `400 VALIDATION_ERROR` (quantity must be above 0), `403`, `404`.
 
 #### GET /api/purchase-orders
-**Who:** A (all branches), M and S (own branch) **(proposed)**.
+**Who:** A (all branches), M and S (own branch), U (all branches, read-only) (decided, N2).
 Query: `?status=`, `?supplierId=`, `?branchId=`, `?from=`, `?to=`, `?page`, `?limit`. Default sort: `-createdAt`. The `items` array is omitted in the list, and `itemCount` is added instead.
 #### GET /api/purchase-orders/:id
+**Who:** A (all branches), M and S (own branch), U (all branches, read-only) (decided, N2).
 Success (200): full PO object.
 
 #### POST /api/purchase-orders/:id/approve and /reject
@@ -644,10 +645,11 @@ Success (201):
 Errors: `400 VALIDATION_ERROR`, `403`, `404`, `422 INSUFFICIENT_STOCK` (`details` lists every short item with `available` and `requested`, see 1.4).
 
 #### GET /api/sales
-**Who:** A (all branches), M and S (own branch). Auditor: no access (T2).
+**Who:** A (all branches), M and S (own branch), U (all branches, read-only) (N2).
 Query: `?branchId=`, `?from=`, `?to=`, `?invoiceNumber=`, `?page`, `?limit`. Default sort: `-createdAt`. Items are omitted in the list, and `itemCount` is added instead.
 
 #### GET /api/sales/:id
+**Who:** A (all branches), M and S (own branch), U (all branches, read-only) (N2).
 Same object as the POST response, plus company fields for printing and `returnedQuantity` per item (used by the returns screen):
 ```json
 { "...": "...", "items": [ { "id": 410, "quantity": 2, "returnedQuantity": 0, "...": "..." } ],
@@ -743,9 +745,10 @@ Staff and Manager: `toBranchId` must be their own branch. Success (201): the tra
 Errors: `400` (same branch, quantity below 1), `403`, `404`.
 
 #### GET /api/transfers
-**Who:** A (all), M and S (own branch, as source or destination) **(proposed)**.
+**Who:** A and U (all branches, U read-only), M and S (own branch, as source or destination) (decided, N2).
 Query: `?status=`, `?direction=incoming|outgoing` (relative to the user's branch), `?branchId=`, `?from=`, `?to=`, `?page`, `?limit`. Manager and Staff see transfers where their branch is source or destination. The list leaves out `items` and adds `itemCount`; `GET /api/transfers/:id` returns the items.
 #### GET /api/transfers/:id
+**Who:** A and U (all branches, U read-only), M and S (own branch, as source or destination) (decided, N2).
 Success (200): the transfer object.
 
 #### Action endpoints (approve, reject, ship, receive)
@@ -900,7 +903,7 @@ Errors: `400 VALIDATION_ERROR` (no file, unreadable file, missing `dryRun`, miss
 
 ## 13. What is still missing (open decisions)
 
-Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided), K-K and N4 (no OPENING_STOCK adjustment reason).
+Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided), K-K and N4 (no OPENING_STOCK adjustment reason), N2 (Auditor reads sales, POs, transfers).
 
 ### 13.1 Blocks Week 2 (answer these first)
 
@@ -929,7 +932,6 @@ Each open item below has a **default to build against (proposed)**. Work starts 
 | # | Gap | My proposal (already applied above) |
 |---|---|---|
 | N1 | The table says Branches, Products and Categories are "No" for everyone but Admin, and Suppliers "No" for Staff. But Staff and Manager need to read products (sales), branches (transfer requests, filters) and suppliers (choosing a supplier on a PO). | The table means **manage**. All roles can **read** branches, categories and products. A, M, S can read suppliers. Melat's screens already assume this. |
-| N2 | The table lists create and action rows only. Who may **view** purchase orders, transfers and returns, and the sales list? | A all, M own, S own. The Auditor has no access. Melat's screens already assume this. |
 | N3 | The SRS Staff dashboard has a `lowStockItems` widget, but T2 says Staff have no low-stock notifications. | Removed from the Staff dashboard. Melat's screens already assume this. |
 | N5 | A user deactivated during a session is blocked on the next request (T5). Which error? | `403 ACCOUNT_DISABLED`, and the frontend logs out on it. **Confirmed by Hemen (H6).** Open only until Kidus confirms. |
 | N6 | Do the sales report and the dashboard sales totals subtract refunded returns? | Not in the first version. Reports show sales as invoiced, and returns are shown separately. |
