@@ -149,7 +149,7 @@ applyMovement({ productId, branchId, quantity, type, reason, referenceId, userId
 ```
 - It runs inside the caller's database transaction, locks the stock row, and writes the stock movement.
 - If stock would go negative it throws `INSUFFICIENT_STOCK`. The API returns it as `422 INSUFFICIENT_STOCK`.
-- Movement `type` values: `OPENING_STOCK`, `PURCHASE_RECEIPT`, `SALE`, `CUSTOMER_RETURN`, `ADJUSTMENT`, `TRANSFER_OUT`, `TRANSFER_IN`.
+- Movement `type` values: `OPENING_STOCK` (written by the seed script, not by an endpoint), `PURCHASE_RECEIPT`, `SALE`, `CUSTOMER_RETURN`, `ADJUSTMENT`, `TRANSFER_OUT`, `TRANSFER_IN`.
 
 ### 1.8 Stock rows exist for every product and branch
 - When a **product** is created, the server creates a stock row with `quantity` 0 for **every branch**.
@@ -657,13 +657,13 @@ Same object as the POST response, plus company fields for printing and `returned
 ### 6.7 Stock adjustments
 
 #### POST /api/adjustments
-**Who:** A, M, S (own branch), for every reason including `OPENING_STOCK` (decided, T2 and T7; the Auditor reviews adjustments). **Changes stock** through `applyMovement`.
+**Who:** A, M, S (own branch) (the Auditor reviews adjustments). **Changes stock** through `applyMovement`.
 ```json
 { "branchId": 1, "productId": 12, "quantity": -3, "reason": "DAMAGE", "note": "Dropped in storage" }
 ```
 - `quantity` is signed: negative decreases stock, positive increases it. It cannot be 0.
-- `reason` is required: `DAMAGE`, `EXPIRY`, `LOSS`, `RECOUNT`, `OTHER`, `OPENING_STOCK`. `note` is optional.
-- **`OPENING_STOCK`:** `quantity` must be positive. The stock movement is recorded with type `OPENING_STOCK` (not `ADJUSTMENT`). This is how opening stock is entered if CSV import is cut.
+- `reason` is required: `DAMAGE`, `EXPIRY`, `LOSS`, `RECOUNT`, `OTHER`. `note` is optional.
+- There is no `OPENING_STOCK` adjustment reason (decided, K-K). Starting stock is loaded by the seed script as `OPENING_STOCK` movements.
 
 Success (201):
 ```json
@@ -671,7 +671,7 @@ Success (201):
   "quantity": -3, "reason": "DAMAGE", "note": "Dropped in storage",
   "createdBy": { "id": 2, "name": "Abel Tesfaye" }, "createdAt": "2026-10-05T09:30:00Z" }
 ```
-Errors: `400 VALIDATION_ERROR` (missing reason, zero quantity, negative `OPENING_STOCK`), `403`, `404`, `422 INSUFFICIENT_STOCK`.
+Errors: `400 VALIDATION_ERROR` (missing reason, zero quantity), `403`, `404`, `422 INSUFFICIENT_STOCK`.
 
 #### GET /api/adjustments
 **Who:** A (all branches), M and S (own branch), U (all, read only). Query: `?branchId=`, `?productId=`, `?reason=`, `?from=`, `?to=`, `?page`, `?limit`.
@@ -900,7 +900,7 @@ Errors: `400 VALIDATION_ERROR` (no file, unreadable file, missing `dryRun`, miss
 
 ## 13. What is still missing (open decisions)
 
-Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided).
+Each open item below has a **default to build against (proposed)**. Work starts with the default. If the answer is different, the last column says what has to be redone. A default is only a proposal until the named person confirms it. Resolved earlier: T1 to T9 (team), K1 to K7 (Kidus), M1, M2 (Melat), H2 to H6 and Hemen's three requests, K-F (audit actions decided), K-K and N4 (no OPENING_STOCK adjustment reason).
 
 ### 13.1 Blocks Week 2 (answer these first)
 
@@ -931,7 +931,6 @@ Each open item below has a **default to build against (proposed)**. Work starts 
 | N1 | The table says Branches, Products and Categories are "No" for everyone but Admin, and Suppliers "No" for Staff. But Staff and Manager need to read products (sales), branches (transfer requests, filters) and suppliers (choosing a supplier on a PO). | The table means **manage**. All roles can **read** branches, categories and products. A, M, S can read suppliers. Melat's screens already assume this. |
 | N2 | The table lists create and action rows only. Who may **view** purchase orders, transfers and returns, and the sales list? | A all, M own, S own. The Auditor has no access. Melat's screens already assume this. |
 | N3 | The SRS Staff dashboard has a `lowStockItems` widget, but T2 says Staff have no low-stock notifications. | Removed from the Staff dashboard. Melat's screens already assume this. |
-| N4 | `OPENING_STOCK` is an adjustment reason, and the table lets Staff create adjustments, so Staff can enter opening stock. | Allow it. Please confirm this is intended, because it lets Staff add stock. |
 | N5 | A user deactivated during a session is blocked on the next request (T5). Which error? | `403 ACCOUNT_DISABLED`, and the frontend logs out on it. **Confirmed by Hemen (H6).** Open only until Kidus confirms. |
 | N6 | Do the sales report and the dashboard sales totals subtract refunded returns? | Not in the first version. Reports show sales as invoiced, and returns are shown separately. |
 | N7 | **Cost price for Staff** (Melat's question). The server currently sends `costPrice` (and `stockValue`) to Staff on products and stock. The UI could hide it, but the server would still send it. | Leave `costPrice` and `stockValue` out of responses for Staff (see 5.4). |
