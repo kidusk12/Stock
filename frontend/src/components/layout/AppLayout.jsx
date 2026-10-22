@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { useAuth } from '../../features/auth/AuthContext'
@@ -8,16 +8,19 @@ import LanguageToggle from '../LanguageToggle'
 import UserAvatar from '../UserAvatar'
 import { toEthiopianDate } from '../../lib/ethiopianDate'
 import { errorKey } from '../../lib/errorMessages'
-import { Bell, Calendar, AlertTriangle } from 'lucide-react'
+import { Bell, Calendar, AlertTriangle, User, LogOut } from 'lucide-react'
 
 export default function AppLayout() {
-  const { user, selectedBranchId, changeBranch } = useAuth()
+  const { user, selectedBranchId, changeBranch, logout } = useAuth()
   const { t, i18n } = useTranslation()
   const isAm = i18n.language === 'am'
   const [branches, setBranches] = useState([])
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifs, setShowNotifs] = useState(false)
+  const notifRef = useRef(null)
+  const userMenuRef = useRef(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const [ethDate, setEthDate] = useState(null)
   const [notificationError, setNotificationError] = useState('')
 
@@ -39,23 +42,31 @@ export default function AppLayout() {
   }, [selectedBranchId, t, user?.role])
 
   useEffect(() => {
-    setEthDate(toEthiopianDate(new Date()))
-    api.get('/branches').then((res) => setBranches(res.data || [])).catch(() => {})
-
-    if (!canViewNotifications) return undefined
-    loadNotifications()
-    const timer = setInterval(loadNotifications, 60000)
-    return () => clearInterval(timer)
-  }, [selectedBranchId, canViewNotifications, loadNotifications])
-
-  useEffect(() => {
-    if (!showNotifs) return undefined
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setShowNotifs(false)
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifs(false)
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
+      }
     }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [showNotifs])
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowNotifs(false)
+        setShowUserMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   const markAllNotificationsRead = async () => {
     try {
@@ -118,7 +129,7 @@ export default function AppLayout() {
             {/* Language Toggle */}
             <LanguageToggle />
 
-            {canViewNotifications && <div className="relative">
+            {canViewNotifications && <div className="relative" ref={notifRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -189,18 +200,61 @@ export default function AppLayout() {
               )}
             </div>}
 
-            {/* Quick Profile Link in Header */}
-            <Link
-              to="/profile"
-              className="flex items-center pl-1 group cursor-pointer"
-              title={t('shell.profile')}
-            >
-              <UserAvatar
-                user={user}
-                size="sm"
-                className="group-hover:ring-2 group-hover:ring-[#173d4a] transition-all shadow-xs"
-              />
-            </Link>
+            {/* User Avatar Menu Dropdown */}
+            <div className="relative pl-1" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu((prev) => !prev)
+                  setShowNotifs(false)
+                }}
+                className="flex items-center group cursor-pointer focus:outline-none"
+                aria-expanded={showUserMenu}
+                aria-haspopup="menu"
+                aria-label={t('shell.profile')}
+              >
+                <UserAvatar
+                  user={user}
+                  size="sm"
+                  className={`transition-all shadow-xs ${showUserMenu ? 'ring-2 ring-[#173d4a]' : 'group-hover:ring-2 group-hover:ring-[#173d4a]'}`}
+                />
+              </button>
+
+              {showUserMenu && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-48 rounded-2xl border border-[#cfdde3] bg-white p-1.5 shadow-xl z-50"
+                >
+                  <div className="px-3 py-2 border-b border-[#edf3f6] mb-1">
+                    <div className="text-xs font-bold text-[#15343f] truncate">{user?.fullName || user?.username}</div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate">{user?.role}</div>
+                  </div>
+
+                  <Link
+                    to="/profile"
+                    role="menuitem"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#15343f] hover:bg-[#edf3f6] transition cursor-pointer"
+                  >
+                    <User className="h-3.5 w-3.5 text-[#4f7988]" />
+                    <span>{t('shell.profileOption', { defaultValue: 'Profile' })}</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowUserMenu(false)
+                      void logout()
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#c66749] hover:bg-[#fbece5]/60 transition cursor-pointer text-left"
+                  >
+                    <LogOut className="h-3.5 w-3.5 text-[#c66749]" />
+                    <span>{t('auth.logout', { defaultValue: 'Log out' })}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

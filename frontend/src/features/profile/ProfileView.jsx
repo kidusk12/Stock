@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
 import { errorKey } from '../../lib/errorMessages'
 
 export default function ProfileView() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { t } = useTranslation()
   const roleKey = user?.role === 'BRANCH_MANAGER' ? 'manager' : String(user?.role || '').toLowerCase()
@@ -47,9 +49,20 @@ export default function ProfileView() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 pb-12">
-      <header>
-        <h1 className="text-2xl font-extrabold text-[#15343f]">{t('profile.title')}</h1>
-        <p className="mt-1 text-sm text-[#728994]">{t('profile.description')}</p>
+      <header className="flex items-center gap-3.5">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white border border-[#cadbe2] text-[#15343f] hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+          aria-label={t('common.back', { defaultValue: 'Back' })}
+          title={t('common.back', { defaultValue: 'Back' })}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-extrabold text-[#15343f]">{t('profile.title')}</h1>
+          <p className="mt-1 text-sm text-[#728994]">{t('profile.description')}</p>
+        </div>
       </header>
 
       <section className="rounded-2xl border border-[#cfdde3] bg-white p-6 shadow-clean">
