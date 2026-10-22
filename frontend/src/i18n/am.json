@@ -48,16 +48,46 @@
     },
     "previewNote": "ይህ የባህሪያት ማብራሪያ ነው፤ የቀጥታ የድርጅት መረጃ አይደለም።",
     "features": {
-      "branches": { "title": "ክምችት በቅርንጫፍ", "description": "የምርት ብዛትን ለእያንዳንዱ ቅርንጫፍ ወይም መጋዘን ለይተው ይከታተሉ።" },
-      "purchasing": { "title": "ግዢ", "description": "የግዢ ትዕዛዞችን ይፍጠሩ፣ ያጽድቁ እና የተቀበሉ ዕቃዎችን ይመዝግቡ።" },
-      "sales": { "title": "ሽያጭ እና ደረሰኞች", "description": "ሽያጮችን ይመዝግቡ፣ ቫት ወይም ቶት ያስሉ እና የንግድ ደረሰኞችን ያትሙ።" },
-      "transfers": { "title": "የቅርንጫፍ ዝውውሮች", "description": "በቅርንጫፎች መካከል ክምችት ይጠይቁ፣ ያጽድቁ፣ ይላኩ እና ይቀበሉ።" },
-      "alerts": { "title": "ዝቅተኛ ክምችት ማስጠንቀቂያ", "description": "የቅርንጫፍ ክምችት ገደቦችን ያዘጋጁ እና ዝቅተኛ ክምችት ማሳወቂያዎችን ይመልከቱ።" },
-      "audit": { "title": "የኦዲት መዝገብ", "description": "የተመዘገቡ የክምችት እንቅስቃሴዎችን እና ጠቃሚ የስርዓት ተግባራትን ይመልከቱ።" },
-      "barcode": { "title": "የባርኮድ ግቤት", "description": "በሚደገፉ ሂደቶች የዩኤስቢ የቁልፍ ሰሌዳ ዓይነት ስካነር ይጠቀሙ።" },
-      "language": { "title": "አማርኛ እና እንግሊዝኛ", "description": "ቋንቋ ይቀይሩ፣ ቀኖችን በኢትዮጵያ ዘመን አቆጣጠር እና ገንዘብን በብር ይመልከቱ።" }
+      "branches": {
+        "title": "ክምችት በቅርንጫፍ",
+        "description": "የምርት ብዛትን ለእያንዳንዱ ቅርንጫፍ ወይም መጋዘን ለይተው ይከታተሉ።"
+      },
+      "purchasing": {
+        "title": "ግዢ",
+        "description": "የግዢ ትዕዛዞችን ይፍጠሩ፣ ያጽድቁ እና የተቀበሉ ዕቃዎችን ይመዝግቡ።"
+      },
+      "sales": {
+        "title": "ሽያጭ እና ደረሰኞች",
+        "description": "ሽያጮችን ይመዝግቡ፣ ቫት ወይም ቶት ያስሉ እና የንግድ ደረሰኞችን ያትሙ።"
+      },
+      "transfers": {
+        "title": "የቅርንጫፍ ዝውውሮች",
+        "description": "በቅርንጫፎች መካከል ክምችት ይጠይቁ፣ ያጽድቁ፣ ይላኩ እና ይቀበሉ።"
+      },
+      "alerts": {
+        "title": "ዝቅተኛ ክምችት ማስጠንቀቂያ",
+        "description": "የቅርንጫፍ ክምችት ገደቦችን ያዘጋጁ እና ዝቅተኛ ክምችት ማሳወቂያዎችን ይመልከቱ።"
+      },
+      "audit": {
+        "title": "የኦዲት መዝገብ",
+        "description": "የተመዘገቡ የክምችት እንቅስቃሴዎችን እና ጠቃሚ የስርዓት ተግባራትን ይመልከቱ።"
+      },
+      "barcode": {
+        "title": "የባርኮድ ግቤት",
+        "description": "በሚደገፉ ሂደቶች የዩኤስቢ የቁልፍ ሰሌዳ ዓይነት ስካነር ይጠቀሙ።"
+      },
+      "language": {
+        "title": "አማርኛ እና እንግሊዝኛ",
+        "description": "ቋንቋ ይቀይሩ፣ ቀኖችን በኢትዮጵያ ዘመን አቆጣጠር እና ገንዘብን በብር ይመልከቱ።"
+      }
     },
-    "steps": { "buy": "ግዛ", "receive": "ተቀበል", "sell": "ሽጥ", "transfer": "አዘዋውር", "report": "ሪፖርት" },
+    "steps": {
+      "buy": "ግዛ",
+      "receive": "ተቀበል",
+      "sell": "ሽጥ",
+      "transfer": "አዘዋውር",
+      "report": "ሪፖርት"
+    },
     "roles": {
       "admin": "የድርጅት መረጃን ያዘጋጃል እና በቅርንጫፎች ያሉ ሥራዎችን ያስተዳድራል።",
       "manager": "ማጽደቂያዎችን እና የክምችት ገደቦችን ጨምሮ አንድ ቅርንጫፍ ያስተዳድራል።",
@@ -83,7 +113,12 @@
     "manager": "የቅርንጫፍ ሥራ አስኪያጅ",
     "staff": "ሠራተኛ",
     "auditor": "ኦዲተር",
-    "roles": { "admin": "አድሚን", "manager": "የቅርንጫፍ ሥራ አስኪያጅ", "staff": "ሠራተኛ", "auditor": "ኦዲተር" },
+    "roles": {
+      "admin": "አድሚን",
+      "manager": "የቅርንጫፍ ሥራ አስኪያጅ",
+      "staff": "ሠራተኛ",
+      "auditor": "ኦዲተር"
+    },
     "loginDescription": "የቅርንጫፍ ክምችትን፣ ግዢን፣ ሽያጭን፣ ዝውውሮችን እና የተመዘገቡ የክምችት እንቅስቃሴዎችን ያስተዳድሩ።",
     "forgotPassword": "የይለፍ ቃልዎን ረስተዋል? እርዳታ ለማግኘት የስርዓት አስተዳዳሪዎን ያነጋግሩ።",
     "showPassword": "የይለፍ ቃል አሳይ",
@@ -131,7 +166,6 @@
     "salesByBranch": "የሽያጭ ድርሻ በቅርንጫፍ",
     "recentMovements": "የቅርብ ጊዜ የክምችት እንቅስቃሴዎች",
     "quickActions": "ፈጣን ተግባራት",
-    "newSale": "አዲስ ሽያጭ",
     "receiveGoods": "ዕቃ ተቀበል",
     "requestTransfer": "አዲስ ዝውውር",
     "makeAdjustment": "ክምችት ማስተካከያ"
@@ -184,7 +218,8 @@
     "confirmImport": "{{count}} ትክክለኛ ምርቶችን አስመጣ",
     "importComplete": "ማስመጣቱ ተጠናቋል፦ {{imported}} ገብተዋል፣ {{skipped}} ተዘልለዋል።",
     "importError": "CSV ማስመጣት አልተሳካም። ፋይሉን ያረጋግጡና እንደገና ይሞክሩ።",
-    "templateError": "የ CSV አብነቱን ማውረድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+    "templateError": "የ CSV አብነቱን ማውረድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+    "selectUnit": "መለኪያ ይምረጡ"
   },
   "stock": {
     "title": "የክምችት አጠቃላይ እይታ",
@@ -322,7 +357,7 @@
     "invalidNumbers": "ብዛትና የአንዱ ዋጋ ከሁለት የዴሲማል ቦታ ያልበለጠ ትክክለኛ ቁጥር መሆን አለበት።",
     "duplicateProduct": "አንድ ምርት በግዢ ትዕዛዙ ውስጥ አንድ ጊዜ ብቻ ሊካተት ይችላል።",
     "enterReceiveQty": "እባክዎ የሚቀበሉትን ብዛት ያስገቡ።",
-    "overReceiveDetail": "{{product}}፦ የቀረው {{remaining}} ነው፣ {{requested}} ተጠይቋል።",
+    "overReceiveDetail": "{{product}}፦ {{requested}} መቀበል አይቻልም (የታዘዘው {{remaining}} ብቻ ነው)።",
     "selectSupplierOption": "አቅራቢ ይምረጡ...",
     "lineItemsTitle": "የትዕዛዝ ዕቃዎች",
     "addProduct": "ምርት አክል",
@@ -511,79 +546,113 @@
     "invoiceCount": "የደረሰኞች ብዛት",
     "netAmount": "የተጣራ መጠን",
     "csv": {
-      "stock": { "productName": "የምርት ስም", "sku": "SKU ኮድ", "branch": "ቅርንጫፍ", "unit": "መለኪያ", "quantity": "ብዛት", "costPrice": "የግዢ ዋጋ (ብር)", "sellingPrice": "የመሸጫ ዋጋ (ብር)", "valuation": "የክምችት ግምት (ብር)" },
-      "movement": { "date": "ቀን", "branch": "ቅርንጫፍ", "product": "ምርት", "type": "የእንቅስቃሴ ዓይነት", "quantityChange": "የብዛት ለውጥ", "quantityAfter": "ቀሪ ብዛት", "reference": "ማጣቀሻ / ምክንያት", "user": "የመዘገበው" },
-      "sales": { "invoice": "የደረሰኝ ቁጥር", "date": "ቀን", "branch": "ቅርንጫፍ", "cashier": "ገንዘብ ተቀባይ", "net": "የተጣራ መጠን (ብር)", "tax": "ግብር (ብር)", "total": "ጠቅላላ ክፍያ (ብር)" }
+      "stock": {
+        "productName": "የምርት ስም",
+        "sku": "SKU ኮድ",
+        "branch": "ቅርንጫፍ",
+        "unit": "መለኪያ",
+        "quantity": "ብዛት",
+        "costPrice": "የግዢ ዋጋ (ብር)",
+        "sellingPrice": "የመሸጫ ዋጋ (ብር)",
+        "valuation": "የክምችት ግምት (ብር)"
+      },
+      "movement": {
+        "date": "ቀን",
+        "branch": "ቅርንጫፍ",
+        "product": "ምርት",
+        "type": "የእንቅስቃሴ ዓይነት",
+        "quantityChange": "የብዛት ለውጥ",
+        "quantityAfter": "ቀሪ ብዛት",
+        "reference": "ማጣቀሻ / ምክንያት",
+        "user": "የመዘገበው"
+      },
+      "sales": {
+        "invoice": "የደረሰኝ ቁጥር",
+        "date": "ቀን",
+        "branch": "ቅርንጫፍ",
+        "cashier": "ገንዘብ ተቀባይ",
+        "net": "የተጣራ መጠን (ብር)",
+        "tax": "ግብር (ብር)",
+        "total": "ጠቅላላ ክፍያ (ብር)"
+      }
     },
-    "movementTypes": { "OPENING_STOCK": "የመጀመሪያ ክምችት", "PURCHASE_RECEIPT": "የግዢ ዕቃ ተቀባይነት", "SALE": "ሽያጭ", "CUSTOMER_RETURN": "የደንበኛ ተመላሽ", "ADJUSTMENT": "ማስተካከያ", "TRANSFER_OUT": "ወደ ውጭ ዝውውር", "TRANSFER_IN": "ወደ ውስጥ ዝውውር" }
+    "movementTypes": {
+      "OPENING_STOCK": "የመጀመሪያ ክምችት",
+      "PURCHASE_RECEIPT": "የግዢ ዕቃ ተቀባይነት",
+      "SALE": "ሽያጭ",
+      "CUSTOMER_RETURN": "የደንበኛ ተመላሽ",
+      "ADJUSTMENT": "ማስተካከያ",
+      "TRANSFER_OUT": "ወደ ውጭ ዝውውር",
+      "TRANSFER_IN": "ወደ ውስጥ ዝውውር"
+    }
   },
   "audit": {
-  "title": "የማይለወጥ የኦዲት መዝገብ",
-  "description": "ማን፣ ምን፣ መቼ እንዳደረገ የሚያሳይ ቋሚ መዝገብ። መዝገቦቹ ሊስተካከሉ ወይም ሊሰረዙ አይችሉም።",
-  "timestamp": "ቀንና ሰዓት",
-  "user": "ተጠቃሚ",
-  "action": "የተከናወነው ተግባር",
-  "entity": "የመረጃ ዓይነት",
-  "branch": "ቅርንጫፍ",
-  "details": "ዝርዝር መረጃ / የነበረው እና አዲሱ ዋጋ",
-  "noBranch": "ለመላው ሲስተም",
-  "allUsers": "ሁሉም ተጠቃሚዎች",
-  "allActions": "ሁሉም ተግባራት",
-  "allEntities": "ሁሉም የመረጃ ዓይነቶች",
-  "entityId": "የመረጃ መለያ ቁጥር",
-  "entityIdPlaceholder": "የመረጃ መለያ ቁጥር ያስገቡ",
-  "product": "ምርት",
-  "productPlaceholder": "የምርት ስም ወይም SKU ይጻፉ",
-  "productPick": "ከቀረቡት ምርጫዎች ውስጥ ምርት ይምረጡ።",
-  "from": "ከቀን",
-  "to": "እስከ ቀን",
-  "applyFilters": "ማጣሪያዎቹን ተግብር",
-  "clearFilters": "ማጣሪያዎቹን አጽዳ",
-  "viewChanges": "ለውጦችን ይመልከቱ ({{count}})",
-  "hideChanges": "ለውጦችን ደብቅ",
-  "field": "መስክ",
-  "oldValue": "የነበረው ዋጋ",
-  "newValue": "አዲሱ ዋጋ",
-  "loadError": "የኦዲት መዝገቡን መጫን አልተቻለም።",
-  "noMatches": "ከእነዚህ ማጣሪያዎች ጋር የሚዛመድ የኦዲት መዝገብ የለም።",
-  "pageSummary": "ገጽ {{page}} ከ{{pageCount}} ({{total}} መዝገቦች)",
-  "actions": {
-    "USER_CREATED": "ተጠቃሚ ተፈጥሯል",
-    "USER_UPDATED": "ተጠቃሚ ተዘምኗል",
-    "USER_LOGOUT": "ተጠቃሚ ወጥቷል",
-    "PRODUCT_CREATED": "ምርት ተፈጥሯል",
-    "PRODUCT_UPDATED": "ምርት ተዘምኗል",
-    "PRICE_CHANGED": "ዋጋ ተቀይሯል",
-    "SUPPLIER_UPDATED": "አቅራቢ ተዘምኗል",
-    "BRANCH_UPDATED": "ቅርንጫፍ ተዘምኗል",
-    "PO_CREATED": "የግዢ ትዕዛዝ ተፈጥሯል",
-    "PO_APPROVED": "የግዢ ትዕዛዝ ጸድቋል",
-    "PO_REJECTED": "የግዢ ትዕዛዝ ውድቅ ተደርጓል",
-    "PO_RECEIVED": "የግዢ ትዕዛዝ ዕቃ ተቀብሏል",
-    "SALE_CREATED": "ሽያጭ ተፈጽሟል",
-    "RETURN_CREATED": "ተመላሽ ተመዝግቧል",
-    "RETURN_REFUNDED": "ለተመላሽ ገንዘብ ተከፍሏል",
-    "ADJUSTMENT_CREATED": "የክምችት ማስተካከያ ተመዝግቧል",
-    "TRANSFER_REQUESTED": "ዝውውር ተጠይቋል",
-    "TRANSFER_APPROVED": "ዝውውር ጸድቋል",
-    "TRANSFER_REJECTED": "ዝውውር ውድቅ ተደርጓል",
-    "TRANSFER_SHIPPED": "ዝውውር ተልኳል",
-    "TRANSFER_RECEIVED": "ዝውውር ተቀብሏል",
-    "IMPORT_CONFIRMED": "ማስመጣት ተረጋግጧል"
+    "title": "የማይለወጥ የኦዲት መዝገብ",
+    "description": "ማን፣ ምን፣ መቼ እንዳደረገ የሚያሳይ ቋሚ መዝገብ። መዝገቦቹ ሊስተካከሉ ወይም ሊሰረዙ አይችሉም።",
+    "timestamp": "ቀንና ሰዓት",
+    "user": "ተጠቃሚ",
+    "action": "የተከናወነው ተግባር",
+    "entity": "የመረጃ ዓይነት",
+    "branch": "ቅርንጫፍ",
+    "details": "ዝርዝር መረጃ / የነበረው እና አዲሱ ዋጋ",
+    "noBranch": "ለመላው ሲስተም",
+    "allUsers": "ሁሉም ተጠቃሚዎች",
+    "allActions": "ሁሉም ተግባራት",
+    "allEntities": "ሁሉም የመረጃ ዓይነቶች",
+    "entityId": "የመረጃ መለያ ቁጥር",
+    "entityIdPlaceholder": "የመረጃ መለያ ቁጥር ያስገቡ",
+    "product": "ምርት",
+    "productPlaceholder": "የምርት ስም ወይም SKU ይጻፉ",
+    "productPick": "ከቀረቡት ምርጫዎች ውስጥ ምርት ይምረጡ።",
+    "from": "ከቀን",
+    "to": "እስከ ቀን",
+    "applyFilters": "ማጣሪያዎቹን ተግብር",
+    "clearFilters": "ማጣሪያዎቹን አጽዳ",
+    "viewChanges": "ለውጦችን ይመልከቱ ({{count}})",
+    "hideChanges": "ለውጦችን ደብቅ",
+    "field": "መስክ",
+    "oldValue": "የነበረው ዋጋ",
+    "newValue": "አዲሱ ዋጋ",
+    "loadError": "የኦዲት መዝገቡን መጫን አልተቻለም።",
+    "noMatches": "ከእነዚህ ማጣሪያዎች ጋር የሚዛመድ የኦዲት መዝገብ የለም።",
+    "pageSummary": "ገጽ {{page}} ከ{{pageCount}} ({{total}} መዝገቦች)",
+    "actions": {
+      "USER_CREATED": "ተጠቃሚ ተፈጥሯል",
+      "USER_UPDATED": "ተጠቃሚ ተዘምኗል",
+      "USER_LOGOUT": "ተጠቃሚ ወጥቷል",
+      "PRODUCT_CREATED": "ምርት ተፈጥሯል",
+      "PRODUCT_UPDATED": "ምርት ተዘምኗል",
+      "PRICE_CHANGED": "ዋጋ ተቀይሯል",
+      "SUPPLIER_UPDATED": "አቅራቢ ተዘምኗል",
+      "BRANCH_UPDATED": "ቅርንጫፍ ተዘምኗል",
+      "PO_CREATED": "የግዢ ትዕዛዝ ተፈጥሯል",
+      "PO_APPROVED": "የግዢ ትዕዛዝ ጸድቋል",
+      "PO_REJECTED": "የግዢ ትዕዛዝ ውድቅ ተደርጓል",
+      "PO_RECEIVED": "የግዢ ትዕዛዝ ዕቃ ተቀብሏል",
+      "SALE_CREATED": "ሽያጭ ተፈጽሟል",
+      "RETURN_CREATED": "ተመላሽ ተመዝግቧል",
+      "RETURN_REFUNDED": "ለተመላሽ ገንዘብ ተከፍሏል",
+      "ADJUSTMENT_CREATED": "የክምችት ማስተካከያ ተመዝግቧል",
+      "TRANSFER_REQUESTED": "ዝውውር ተጠይቋል",
+      "TRANSFER_APPROVED": "ዝውውር ጸድቋል",
+      "TRANSFER_REJECTED": "ዝውውር ውድቅ ተደርጓል",
+      "TRANSFER_SHIPPED": "ዝውውር ተልኳል",
+      "TRANSFER_RECEIVED": "ዝውውር ተቀብሏል",
+      "IMPORT_CONFIRMED": "ማስመጣት ተረጋግጧል"
+    },
+    "entityTypes": {
+      "USER": "ተጠቃሚ",
+      "PRODUCT": "ምርት",
+      "SUPPLIER": "አቅራቢ",
+      "BRANCH": "ቅርንጫፍ",
+      "PO": "የግዢ ትዕዛዝ",
+      "SALE": "ሽያጭ",
+      "RETURN": "ተመላሽ",
+      "ADJUSTMENT": "ማስተካከያ",
+      "TRANSFER": "ዝውውር",
+      "IMPORT": "ማስመጣት"
+    }
   },
-  "entityTypes": {
-    "USER": "ተጠቃሚ",
-    "PRODUCT": "ምርት",
-    "SUPPLIER": "አቅራቢ",
-    "BRANCH": "ቅርንጫፍ",
-    "PO": "የግዢ ትዕዛዝ",
-    "SALE": "ሽያጭ",
-    "RETURN": "ተመላሽ",
-    "ADJUSTMENT": "ማስተካከያ",
-    "TRANSFER": "ዝውውር",
-    "IMPORT": "ማስመጣት"
-  }
-},
   "users": {
     "title": "የተጠቃሚ መለያዎች",
     "addUser": "ተጠቃሚ አክል",
@@ -614,7 +683,12 @@
     "statusError": "የመለያውን ሁኔታ ማዘመን አልተቻለም።",
     "resetError": "የይለፍ ቃሉን ዳግም ማስቀመጥ አልተቻለም።",
     "pageSummary": "ገጽ {{page}} ከ {{pageCount}} · {{total}} መለያዎች",
-    "roles": { "ADMIN": "አስተዳዳሪ", "BRANCH_MANAGER": "የቅርንጫፍ አስተዳዳሪ", "STAFF": "ሰራተኛ", "AUDITOR": "ኦዲተር" },
+    "roles": {
+      "ADMIN": "አስተዳዳሪ",
+      "BRANCH_MANAGER": "የቅርንጫፍ አስተዳዳሪ",
+      "STAFF": "ሰራተኛ",
+      "AUDITOR": "ኦዲተር"
+    },
     "activate": "አንቃ",
     "deactivate": "አግድ"
   },
@@ -706,7 +780,8 @@
     "noData": "ምንም መረጃ አልተገኘም።",
     "status": "ሁኔታ",
     "confirm": "አረጋግጥ",
-    "close": "ዝጋ"
+    "close": "ዝጋ",
+    "back": "ተመለስ"
   },
   "notFound": {
     "title": "ገጹ አልተገኘም",
@@ -736,10 +811,25 @@
     "lowStockNotification": "ዝቅተኛ ክምችት፦ {{product}} በ{{branch}} ያለው {{quantity}} ነው (ዝቅተኛ ገደብ {{minimum}})።",
     "profile": "መገለጫን ይመልከቱ",
     "primaryNavigation": "ዋና ማውጫ",
-    "moreModules": "ተጨማሪ ክፍሎች"
+    "moreModules": "ተጨማሪ ክፍሎች",
+    "profileOption": "መገለጫ"
   },
   "calendar": {
-    "months": ["መስከረም", "ጥቅምት", "ኅዳር", "ታኅሣሥ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜ"]
+    "months": [
+      "መስከረም",
+      "ጥቅምት",
+      "ኅዳር",
+      "ታኅሣሥ",
+      "ጥር",
+      "የካቲት",
+      "መጋቢት",
+      "ሚያዝያ",
+      "ግንቦት",
+      "ሰኔ",
+      "ሐምሌ",
+      "ነሐሴ",
+      "ጳጉሜ"
+    ]
   },
   "status": {
     "PENDING_APPROVAL": "ማጽደቅ ይጠብቃል",

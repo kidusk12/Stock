@@ -48,16 +48,46 @@
     },
     "previewNote": "This is a feature overview, not live company data.",
     "features": {
-      "branches": { "title": "Stock by branch", "description": "Track product quantities separately for each branch or warehouse." },
-      "purchasing": { "title": "Purchasing", "description": "Create purchase orders, approve them and record received goods." },
-      "sales": { "title": "Sales and invoices", "description": "Record sales, calculate VAT or TOT and print business invoices." },
-      "transfers": { "title": "Branch transfers", "description": "Request, approve, ship and receive stock between branches." },
-      "alerts": { "title": "Low-stock alerts", "description": "Set branch stock thresholds and review low-stock notifications." },
-      "audit": { "title": "Audit trail", "description": "Review recorded stock movements and important system actions." },
-      "barcode": { "title": "Barcode input", "description": "Use a USB keyboard-style barcode scanner in supported workflows." },
-      "language": { "title": "Amharic and English", "description": "Switch languages and view dates in the Ethiopian calendar and amounts in birr." }
+      "branches": {
+        "title": "Stock by branch",
+        "description": "Track product quantities separately for each branch or warehouse."
+      },
+      "purchasing": {
+        "title": "Purchasing",
+        "description": "Create purchase orders, approve them and record received goods."
+      },
+      "sales": {
+        "title": "Sales and invoices",
+        "description": "Record sales, calculate VAT or TOT and print business invoices."
+      },
+      "transfers": {
+        "title": "Branch transfers",
+        "description": "Request, approve, ship and receive stock between branches."
+      },
+      "alerts": {
+        "title": "Low-stock alerts",
+        "description": "Set branch stock thresholds and review low-stock notifications."
+      },
+      "audit": {
+        "title": "Audit trail",
+        "description": "Review recorded stock movements and important system actions."
+      },
+      "barcode": {
+        "title": "Barcode input",
+        "description": "Use a USB keyboard-style barcode scanner in supported workflows."
+      },
+      "language": {
+        "title": "Amharic and English",
+        "description": "Switch languages and view dates in the Ethiopian calendar and amounts in birr."
+      }
     },
-    "steps": { "buy": "Buy", "receive": "Receive", "sell": "Sell", "transfer": "Transfer", "report": "Report" },
+    "steps": {
+      "buy": "Buy",
+      "receive": "Receive",
+      "sell": "Sell",
+      "transfer": "Transfer",
+      "report": "Report"
+    },
     "roles": {
       "admin": "Configures company data and manages operations across branches.",
       "manager": "Manages one branch, including approvals and stock thresholds.",
@@ -83,7 +113,12 @@
     "manager": "Branch Manager",
     "staff": "Staff",
     "auditor": "Auditor",
-    "roles": { "admin": "Admin", "manager": "Branch Manager", "staff": "Staff", "auditor": "Auditor" },
+    "roles": {
+      "admin": "Admin",
+      "manager": "Branch Manager",
+      "staff": "Staff",
+      "auditor": "Auditor"
+    },
     "loginDescription": "Manage branch stock, purchasing, sales, transfers and recorded stock movements.",
     "forgotPassword": "Forgot your password? Contact your system administrator for help.",
     "showPassword": "Show password",
@@ -110,7 +145,7 @@
     "invoiceCountLabel": "Invoices today",
     "findProduct": "Find a product",
     "searchProduct": "Open sales to search or scan products",
-    "newSale": "New sale",
+    "newSale": "New Sale",
     "expectedPurchaseOrders": "Expected purchase orders",
     "noExpectedOrders": "No expected purchase orders.",
     "pendingTransfers": "Pending transfers",
@@ -131,7 +166,6 @@
     "salesByBranch": "Sales by Branch",
     "recentMovements": "Recent Stock Movements",
     "quickActions": "Quick Actions",
-    "newSale": "New Sale",
     "receiveGoods": "Receive Goods",
     "requestTransfer": "New Transfer",
     "makeAdjustment": "Stock Adjustment"
@@ -184,7 +218,8 @@
     "confirmImport": "Import {{count}} valid products",
     "importComplete": "Import complete: {{imported}} imported, {{skipped}} skipped.",
     "importError": "CSV import failed. Check the file and try again.",
-    "templateError": "CSV template could not be downloaded. Please try again."
+    "templateError": "CSV template could not be downloaded. Please try again.",
+    "selectUnit": "Select a unit"
   },
   "stock": {
     "title": "Stock Overview",
@@ -319,7 +354,7 @@
     "invalidNumbers": "Quantities and unit costs must be positive or zero numbers with no more than two decimal places.",
     "duplicateProduct": "A product can only appear once in a purchase order.",
     "enterReceiveQty": "Enter at least one quantity to receive.",
-    "overReceiveDetail": "{{product}}: {{remaining}} remaining, {{requested}} requested.",
+    "overReceiveDetail": "{{product}}: Cannot receive {{requested}} (only {{remaining}} ordered).",
     "selectSupplierOption": "Select supplier...",
     "lineItemsTitle": "Order line items",
     "addProduct": "Add product",
@@ -402,16 +437,16 @@
     "completed": "Completed",
     "noMatches": "No transfers match these filters.",
     "pageSummary": "Page {{page}} of {{pageCount}} · {{total}} transfers",
-    "loadError": "Could not load transfers.",
-    "createError": "Could not create the transfer request.",
-    "approveError": "Could not approve this transfer.",
-    "rejectError": "Could not reject this transfer.",
-    "shipError": "Could not ship this transfer.",
-    "receiveError": "Could not confirm receipt.",
-    "rejectPrompt": "Reject transfer {{transfer}}?",
+    "loadError": "Transfers could not be loaded.",
+    "createError": "The transfer request could not be created.",
+    "approveError": "The transfer could not be approved.",
+    "rejectError": "The transfer could not be rejected.",
+    "shipError": "The transfer could not be shipped.",
+    "receiveError": "The transfer receipt could not be confirmed.",
+    "rejectPrompt": "Reject transfer {{transfer}}? Stock will not move.",
     "rejectReason": "Reason (optional)",
-    "rejectReasonPlaceholder": "Enter a reason (up to 300 characters)",
-    "confirmReject": "Confirm rejection",
+    "rejectReasonPlaceholder": "Explain why this transfer is being rejected.",
+    "confirmReject": "Reject transfer",
     "detailTitle": "Transfer detail",
     "detailLoadError": "Could not load this transfer.",
     "backToList": "Back to transfers",
@@ -425,18 +460,6 @@
     "rejectedBy": "Rejected by",
     "shippedBy": "Shipped by",
     "receivedBy": "Received by",
-    "noMatches": "No transfers match these filters.",
-    "pageSummary": "Page {{page}} of {{pageCount}} · {{total}} transfers",
-    "loadError": "Transfers could not be loaded.",
-    "createError": "The transfer request could not be created.",
-    "approveError": "The transfer could not be approved.",
-    "rejectError": "The transfer could not be rejected.",
-    "shipError": "The transfer could not be shipped.",
-    "receiveError": "The transfer receipt could not be confirmed.",
-    "rejectPrompt": "Reject transfer {{transfer}}? Stock will not move.",
-    "rejectReason": "Reason (optional)",
-    "rejectReasonPlaceholder": "Explain why this transfer is being rejected.",
-    "confirmReject": "Reject transfer",
     "ship": "Ship Goods",
     "confirmReceipt": "Confirm Receipt",
     "inTransit": "In Transit",
@@ -520,79 +543,113 @@
     "invoiceCount": "Invoices Count",
     "netAmount": "Net Amount",
     "csv": {
-      "stock": { "productName": "Product Name", "sku": "SKU", "branch": "Branch", "unit": "Unit", "quantity": "Quantity", "costPrice": "Cost Price (ETB)", "sellingPrice": "Selling Price (ETB)", "valuation": "Valuation (ETB)" },
-      "movement": { "date": "Date", "branch": "Branch", "product": "Product", "type": "Movement Type", "quantityChange": "Qty Change", "quantityAfter": "Qty After", "reference": "Reference / Reason", "user": "Logged By" },
-      "sales": { "invoice": "Invoice #", "date": "Date", "branch": "Branch", "cashier": "Cashier", "net": "Net (ETB)", "tax": "Tax (ETB)", "total": "Total Amount (ETB)" }
+      "stock": {
+        "productName": "Product Name",
+        "sku": "SKU",
+        "branch": "Branch",
+        "unit": "Unit",
+        "quantity": "Quantity",
+        "costPrice": "Cost Price (ETB)",
+        "sellingPrice": "Selling Price (ETB)",
+        "valuation": "Valuation (ETB)"
+      },
+      "movement": {
+        "date": "Date",
+        "branch": "Branch",
+        "product": "Product",
+        "type": "Movement Type",
+        "quantityChange": "Qty Change",
+        "quantityAfter": "Qty After",
+        "reference": "Reference / Reason",
+        "user": "Logged By"
+      },
+      "sales": {
+        "invoice": "Invoice #",
+        "date": "Date",
+        "branch": "Branch",
+        "cashier": "Cashier",
+        "net": "Net (ETB)",
+        "tax": "Tax (ETB)",
+        "total": "Total Amount (ETB)"
+      }
     },
-    "movementTypes": { "OPENING_STOCK": "Opening Stock", "PURCHASE_RECEIPT": "Purchase Receipt", "SALE": "Sale", "CUSTOMER_RETURN": "Customer Return", "ADJUSTMENT": "Adjustment", "TRANSFER_OUT": "Transfer Out", "TRANSFER_IN": "Transfer In" }
+    "movementTypes": {
+      "OPENING_STOCK": "Opening Stock",
+      "PURCHASE_RECEIPT": "Purchase Receipt",
+      "SALE": "Sale",
+      "CUSTOMER_RETURN": "Customer Return",
+      "ADJUSTMENT": "Adjustment",
+      "TRANSFER_OUT": "Transfer Out",
+      "TRANSFER_IN": "Transfer In"
+    }
   },
   "audit": {
-  "title": "Immutable Audit Trail",
-  "description": "Permanent, append-only record of who did what and when. Entries cannot be edited or deleted.",
-  "timestamp": "Date and time",
-  "user": "User",
-  "action": "Action",
-  "entity": "Entity",
-  "branch": "Branch",
-  "details": "Details / Old & New Values",
-  "noBranch": "System-wide",
-  "allUsers": "All users",
-  "allActions": "All actions",
-  "allEntities": "All entities",
-  "entityId": "Entity ID",
-  "entityIdPlaceholder": "Enter an entity ID",
-  "product": "Product",
-  "productPlaceholder": "Type a product name or SKU",
-  "productPick": "Pick a product from the suggestions list.",
-  "from": "From date",
-  "to": "To date",
-  "applyFilters": "Apply filters",
-  "clearFilters": "Clear filters",
-  "viewChanges": "View changes ({{count}})",
-  "hideChanges": "Hide changes",
-  "field": "Field",
-  "oldValue": "Old value",
-  "newValue": "New value",
-  "loadError": "The audit log could not be loaded.",
-  "noMatches": "No audit entries match these filters.",
-  "pageSummary": "Page {{page}} of {{pageCount}} ({{total}} entries)",
-  "actions": {
-    "USER_CREATED": "User created",
-    "USER_UPDATED": "User updated",
-    "USER_LOGOUT": "User logged out",
-    "PRODUCT_CREATED": "Product created",
-    "PRODUCT_UPDATED": "Product updated",
-    "PRICE_CHANGED": "Price changed",
-    "SUPPLIER_UPDATED": "Supplier updated",
-    "BRANCH_UPDATED": "Branch updated",
-    "PO_CREATED": "Purchase order created",
-    "PO_APPROVED": "Purchase order approved",
-    "PO_REJECTED": "Purchase order rejected",
-    "PO_RECEIVED": "Purchase order received",
-    "SALE_CREATED": "Sale created",
-    "RETURN_CREATED": "Return created",
-    "RETURN_REFUNDED": "Return refunded",
-    "ADJUSTMENT_CREATED": "Adjustment created",
-    "TRANSFER_REQUESTED": "Transfer requested",
-    "TRANSFER_APPROVED": "Transfer approved",
-    "TRANSFER_REJECTED": "Transfer rejected",
-    "TRANSFER_SHIPPED": "Transfer shipped",
-    "TRANSFER_RECEIVED": "Transfer received",
-    "IMPORT_CONFIRMED": "Import confirmed"
+    "title": "Immutable Audit Trail",
+    "description": "Permanent, append-only record of who did what and when. Entries cannot be edited or deleted.",
+    "timestamp": "Date and time",
+    "user": "User",
+    "action": "Action",
+    "entity": "Entity",
+    "branch": "Branch",
+    "details": "Details / Old & New Values",
+    "noBranch": "System-wide",
+    "allUsers": "All users",
+    "allActions": "All actions",
+    "allEntities": "All entities",
+    "entityId": "Entity ID",
+    "entityIdPlaceholder": "Enter an entity ID",
+    "product": "Product",
+    "productPlaceholder": "Type a product name or SKU",
+    "productPick": "Pick a product from the suggestions list.",
+    "from": "From date",
+    "to": "To date",
+    "applyFilters": "Apply filters",
+    "clearFilters": "Clear filters",
+    "viewChanges": "View changes ({{count}})",
+    "hideChanges": "Hide changes",
+    "field": "Field",
+    "oldValue": "Old value",
+    "newValue": "New value",
+    "loadError": "The audit log could not be loaded.",
+    "noMatches": "No audit entries match these filters.",
+    "pageSummary": "Page {{page}} of {{pageCount}} ({{total}} entries)",
+    "actions": {
+      "USER_CREATED": "User created",
+      "USER_UPDATED": "User updated",
+      "USER_LOGOUT": "User logged out",
+      "PRODUCT_CREATED": "Product created",
+      "PRODUCT_UPDATED": "Product updated",
+      "PRICE_CHANGED": "Price changed",
+      "SUPPLIER_UPDATED": "Supplier updated",
+      "BRANCH_UPDATED": "Branch updated",
+      "PO_CREATED": "Purchase order created",
+      "PO_APPROVED": "Purchase order approved",
+      "PO_REJECTED": "Purchase order rejected",
+      "PO_RECEIVED": "Purchase order received",
+      "SALE_CREATED": "Sale created",
+      "RETURN_CREATED": "Return created",
+      "RETURN_REFUNDED": "Return refunded",
+      "ADJUSTMENT_CREATED": "Adjustment created",
+      "TRANSFER_REQUESTED": "Transfer requested",
+      "TRANSFER_APPROVED": "Transfer approved",
+      "TRANSFER_REJECTED": "Transfer rejected",
+      "TRANSFER_SHIPPED": "Transfer shipped",
+      "TRANSFER_RECEIVED": "Transfer received",
+      "IMPORT_CONFIRMED": "Import confirmed"
+    },
+    "entityTypes": {
+      "USER": "User",
+      "PRODUCT": "Product",
+      "SUPPLIER": "Supplier",
+      "BRANCH": "Branch",
+      "PO": "Purchase order",
+      "SALE": "Sale",
+      "RETURN": "Return",
+      "ADJUSTMENT": "Adjustment",
+      "TRANSFER": "Transfer",
+      "IMPORT": "Import"
+    }
   },
-  "entityTypes": {
-    "USER": "User",
-    "PRODUCT": "Product",
-    "SUPPLIER": "Supplier",
-    "BRANCH": "Branch",
-    "PO": "Purchase order",
-    "SALE": "Sale",
-    "RETURN": "Return",
-    "ADJUSTMENT": "Adjustment",
-    "TRANSFER": "Transfer",
-    "IMPORT": "Import"
-  }
-},
   "users": {
     "title": "User Accounts",
     "addUser": "Add User",
@@ -623,7 +680,12 @@
     "statusError": "Account status could not be updated. Please try again.",
     "resetError": "Password could not be reset. Please try again.",
     "pageSummary": "Page {{page}} of {{pageCount}} · {{total}} accounts",
-    "roles": { "ADMIN": "Admin", "BRANCH_MANAGER": "Branch Manager", "STAFF": "Staff", "AUDITOR": "Auditor" },
+    "roles": {
+      "ADMIN": "Admin",
+      "BRANCH_MANAGER": "Branch Manager",
+      "STAFF": "Staff",
+      "AUDITOR": "Auditor"
+    },
     "activate": "Activate",
     "deactivate": "Deactivate"
   },
@@ -715,7 +777,8 @@
     "noData": "No records found.",
     "status": "Status",
     "confirm": "Confirm",
-    "close": "Close"
+    "close": "Close",
+    "back": "Back"
   },
   "notFound": {
     "title": "Page not found",
@@ -745,10 +808,25 @@
     "lowStockNotification": "Low stock: {{product}} at {{branch}} has {{quantity}} (minimum {{minimum}}).",
     "profile": "View profile",
     "primaryNavigation": "Main navigation",
-    "moreModules": "More modules"
+    "moreModules": "More modules",
+    "profileOption": "Profile"
   },
   "calendar": {
-    "months": ["Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit", "Megabit", "Miazia", "Ginbot", "Sene", "Hamle", "Nehase", "Pagume"]
+    "months": [
+      "Meskerem",
+      "Tikimt",
+      "Hidar",
+      "Tahsas",
+      "Tir",
+      "Yekatit",
+      "Megabit",
+      "Miazia",
+      "Ginbot",
+      "Sene",
+      "Hamle",
+      "Nehase",
+      "Pagume"
+    ]
   },
   "status": {
     "PENDING_APPROVAL": "Pending Approval",

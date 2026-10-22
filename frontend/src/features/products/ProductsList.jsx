@@ -13,6 +13,26 @@ import {
   Download
 } from 'lucide-react'
 
+const UNIT_OPTIONS = [
+  'piece',
+  'box',
+  'carton',
+  'pack',
+  'bag',
+  'bottle',
+  'kg',
+  'g',
+  'liter',
+  'meter',
+  'roll',
+  'can',
+  'pair',
+  'set',
+  'dozen',
+  'sheet',
+  'bundle',
+]
+
 export default function ProductsList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
@@ -508,16 +528,21 @@ export default function ProductsList() {
                 </div>
                 <div>
                   <label htmlFor="product-unit" className="block font-bold text-slate-700 mb-1">{t('products.unit')} *</label>
-                  <input
+                  <select
                     id="product-unit"
-                    type="text"
                     required
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    maxLength={20}
-                    placeholder={t('products.exampleUnit')}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  />
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none bg-white"
+                  >
+                    <option value="">{t('products.selectUnit')}</option>
+                    {UNIT_OPTIONS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                    {formData.unit && !UNIT_OPTIONS.includes(formData.unit) && (
+                      <option value={formData.unit}>{formData.unit}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
