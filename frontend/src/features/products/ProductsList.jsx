@@ -294,7 +294,7 @@ export default function ProductsList() {
               <tr>
                 <th className="py-3.5 px-4">{t('products.name')}</th>
                 <th className="py-3.5 px-4">{t('products.sku')} / {t('products.barcode')}</th>
-                <th className="py-3.5 px-4">{t('products.category')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('products.category')}</th>
                 {user?.role !== 'STAFF' && (
                   <th className="py-3.5 px-4 text-right">{t('products.costPrice')}</th>
                 )}
@@ -333,8 +333,8 @@ export default function ProductsList() {
                       <div>{p.sku}</div>
                       {p.barcode && <div className="text-slate-400 text-[10px]">{p.barcode}</div>}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-block whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                         {p.categoryName || '—'}
                       </span>
                     </td>
