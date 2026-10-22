@@ -590,7 +590,9 @@
       "ADJUSTMENT": "ማስተካከያ",
       "TRANSFER_OUT": "ወደ ውጭ ዝውውር",
       "TRANSFER_IN": "ወደ ውስጥ ዝውውር"
-    }
+    },
+    "inventoryAllBranches": "በሁሉም ቅርንጫፎች ውስጥ ያለ ክምችት",
+    "inventoryForBranch": "ለ{{branch}} ቅርንጫፍ ያለ ክምችት"
   },
   "audit": {
     "title": "የማይለወጥ የኦዲት መዝገብ",

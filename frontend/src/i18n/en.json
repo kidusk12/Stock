@@ -587,7 +587,9 @@
       "ADJUSTMENT": "Adjustment",
       "TRANSFER_OUT": "Transfer Out",
       "TRANSFER_IN": "Transfer In"
-    }
+    },
+    "inventoryAllBranches": "Inventory across all branches",
+    "inventoryForBranch": "Inventory for {{branch}}"
   },
   "audit": {
     "title": "Immutable Audit Trail",
