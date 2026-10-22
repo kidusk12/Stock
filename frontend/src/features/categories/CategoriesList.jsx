@@ -91,6 +91,7 @@ export default function CategoriesList() {
 
       {error && !showModal && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase text-slate-600">
             <tr><th scope="col" className="px-4 py-3">{t('categories.name')}</th><th scope="col" className="px-4 py-3 text-center">{t('common.status')}</th>{isAdmin && <th scope="col" className="px-4 py-3 text-right">{t('common.actions')}</th>}</tr>
@@ -110,6 +111,7 @@ export default function CategoriesList() {
                 ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowModal(false) }}>

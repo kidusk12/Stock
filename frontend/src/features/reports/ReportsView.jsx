@@ -286,35 +286,35 @@ export default function ReportsView() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[11px] font-bold">
                 <tr>
-                  <th className="py-3 px-4">{t('sales.date')}</th>
-                  <th className="py-3 px-4">{t('adjustments.branch')}</th>
-                  <th className="py-3 px-4">{t('adjustments.product')}</th>
-                  <th className="py-3 px-4">{t('reports.csv.movement.type')}</th>
-                  <th className="py-3 px-4 text-center">{t('adjustments.change')}</th>
-                  <th className="py-3 px-4 text-center">{t('reports.csv.movement.quantityAfter')}</th>
-                  <th className="py-3 px-4">{t('reports.csv.movement.reference')}</th>
-                  <th className="py-3 px-4">{t('reports.csv.movement.user')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('sales.date')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('adjustments.branch')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('adjustments.product')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('reports.csv.movement.type')}</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">{t('adjustments.change')}</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">{t('reports.csv.movement.quantityAfter')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('reports.csv.movement.reference')}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{t('reports.csv.movement.user')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
                 {data.map((m) => (
                   <tr key={m.id} className="hover:bg-slate-50/70">
-                    <td className="py-3 px-4 text-slate-500">{formatDate(m.date, i18n.language)}</td>
-                    <td className="py-3 px-4">{m.branchName}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">{m.productName}</td>
-                    <td className="py-3 px-4">
-                      <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-bold text-[10px] text-slate-700">
+                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(m.date, i18n.language)}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">{m.branchName}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900 whitespace-nowrap">{m.productName}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-block whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                         {t(`reports.movementTypes.${m.type}`, { defaultValue: m.type })}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-extrabold">
+                    <td className="py-3 px-4 text-center font-extrabold whitespace-nowrap">
                       <span className={m.quantityChange > 0 ? 'text-emerald-700' : 'text-red-600'}>
                         {m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-slate-800">{m.quantityAfter}</td>
-                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{m.reason ? t(`reasons.${m.reason}`, { defaultValue: m.reason }) : m.reference || '—'}</td>
-                    <td className="py-3 px-4 text-slate-600">{m.user}</td>
+                    <td className="py-3 px-4 text-center font-bold text-slate-800 whitespace-nowrap">{m.quantityAfter}</td>
+                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">{m.reason ? t(`reasons.${m.reason}`, { defaultValue: m.reason }) : m.reference || '—'}</td>
+                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{m.user}</td>
                   </tr>
                 ))}
               </tbody>

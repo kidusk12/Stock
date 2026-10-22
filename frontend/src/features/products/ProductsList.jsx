@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
@@ -75,6 +75,8 @@ export default function ProductsList() {
   const [importResult, setImportResult] = useState(null)
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef(null)
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -178,22 +180,32 @@ export default function ProductsList() {
     }
   }
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0]
-    e.target.value = ''
+  const uploadAndPreviewFile = async (file, branchId = importBranchId) => {
     if (!file) return
+
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type && !file.type.includes('csv')) {
+      setImportError(t('products.onlyCsvSupported', { defaultValue: 'Only CSV files are supported (.csv)' }))
+      return
+    }
+
     setImportFile(file)
     setImportResult(null)
+
+    if (!branchId) {
+      setImportError(t('products.selectOpeningBranch', { defaultValue: 'Select a branch to import rows with opening stock.' }))
+      return
+    }
+
     setImportError('')
     setImportBusy(true)
     try {
       const upload = new FormData()
       upload.append('file', file)
-      if (importBranchId) upload.append('branchId', importBranchId)
+      if (branchId) upload.append('branchId', branchId)
       const result = await api.post('/import/products?dryRun=true', upload)
       setImportResult(result)
     } catch (err) {
-      setImportError(err.code === 'VALIDATION_ERROR' && !importBranchId
+      setImportError(err.code === 'VALIDATION_ERROR' && !branchId
         ? t('products.selectOpeningBranch')
         : t(`errors.${err.code}`, { defaultValue: t('products.importError') }))
     } finally {
@@ -201,8 +213,18 @@ export default function ProductsList() {
     }
   }
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) void uploadAndPreviewFile(file)
+  }
+
   const confirmImport = async () => {
     if (!importFile) return
+    if (!importBranchId) {
+      setImportError(t('products.selectOpeningBranch'))
+      return
+    }
     setImportBusy(true)
     setImportError('')
     try {
@@ -253,7 +275,16 @@ export default function ProductsList() {
           {user?.role === 'ADMIN' && (
             <>
               <button
-                onClick={() => { setImportFile(null); setImportResult(null); setImportError(''); setImportBranchId(selectedBranchId ? String(selectedBranchId) : ''); setShowImportModal(true) }}
+                onClick={() => {
+                  setImportFile(null);
+                  setImportResult(null);
+                  setImportError('');
+                  const defaultBranch = selectedBranchId
+                    ? String(selectedBranchId)
+                    : (branches.find((b) => b.isActive)?.id ? String(branches.find((b) => b.isActive).id) : '');
+                  setImportBranchId(defaultBranch);
+                  setShowImportModal(true);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
@@ -548,7 +579,7 @@ export default function ProductsList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="product-cost" className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB)</label>
+                  <label htmlFor="product-cost" className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB) *</label>
                   <input
                     id="product-cost"
                     type="number"
@@ -562,7 +593,7 @@ export default function ProductsList() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="product-selling-price" className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB)</label>
+                  <label htmlFor="product-selling-price" className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB) *</label>
                   <input
                     id="product-selling-price"
                     type="number"
@@ -612,17 +643,93 @@ export default function ProductsList() {
             <div className="mt-4 space-y-4 text-xs">
               <p className="text-slate-600">{t('products.importDescription')}</p>
               <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" aria-hidden="true" />{t('products.downloadTemplate')}</button>
-              <label className="block text-sm font-semibold text-slate-700">{t('products.openingStockBranch')}
-                <select value={importBranchId} onChange={(e) => { setImportBranchId(e.target.value); setImportResult(null) }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal">
-                  <option value="">{t('products.noOpeningStock')}</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              <label className="block text-sm font-bold text-slate-700">
+                {t('products.openingStockBranch')}
+                <select
+                  value={importBranchId}
+                  onChange={(e) => {
+                    const newBranch = e.target.value
+                    setImportBranchId(newBranch)
+                    setImportError('')
+                    if (importFile) {
+                      void uploadAndPreviewFile(importFile, newBranch)
+                    } else {
+                      setImportResult(null)
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  required
+                >
+                  <option value="" disabled>
+                    {t('products.selectBranch', { defaultValue: 'Select a branch *' })}
+                  </option>
+                  {branches.filter((branch) => branch.isActive).map((branch) => (
+                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                  ))}
                 </select>
               </label>
-              <div className="rounded-xl border-2 border-dashed border-slate-300 p-5 text-center">
-                <Upload className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
-                <label className="mt-2 block cursor-pointer font-bold text-teal-800">{t('products.chooseCsv')}
-                  <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} className="sr-only" />
-                </label>
-                {importFile && <p className="mt-1 text-slate-500">{importFile.name}</p>}
+
+              {/* Drag and Drop Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                  const droppedFile = e.dataTransfer?.files?.[0]
+                  if (droppedFile) {
+                    void uploadAndPreviewFile(droppedFile)
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all cursor-pointer select-none ${
+                  isDragging
+                    ? 'border-teal-600 bg-teal-50/80 scale-[1.01] ring-4 ring-teal-100'
+                    : 'border-slate-300 hover:border-teal-600/70 hover:bg-slate-50/80 bg-slate-50/40'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileUpload}
+                  className="sr-only"
+                />
+                <Upload
+                  className={`mx-auto h-8 w-8 transition-transform ${
+                    isDragging ? 'text-teal-600 scale-110 animate-bounce' : 'text-slate-400'
+                  }`}
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-bold text-teal-800">
+                  {isDragging
+                    ? t('products.dropFileHere', { defaultValue: 'Drop the CSV file here' })
+                    : t('products.dragOrBrowse', { defaultValue: 'Drag & drop your CSV file here, or browse' })}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {t('products.csvOnlyHint', { defaultValue: 'Supports standard CSV format (.csv)' })}
+                </p>
+                {importFile && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-teal-100/70 px-3 py-1.5 text-xs font-semibold text-teal-900 border border-teal-200">
+                    <FileSpreadsheet className="h-4 w-4 text-teal-700" />
+                    <span>{importFile.name}</span>
+                    <span className="text-[10px] text-teal-600">({(importFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                )}
               </div>
               {importError && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{importError}</div>}
               {importBusy && <p className="text-center text-slate-500" role="status">{t('common.loading')}</p>}
