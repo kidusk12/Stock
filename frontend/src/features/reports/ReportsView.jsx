@@ -7,7 +7,8 @@ import { errorKey } from '../../lib/errorMessages'
 import {
   Download,
   Printer,
-  Boxes
+  Boxes,
+  TrendingUp
 } from 'lucide-react'
 
 const PAGE_SIZE = 20
@@ -22,6 +23,8 @@ export default function ReportsView() {
   const [page, setPage] = useState(1)
   const [reloadKey, setReloadKey] = useState(0)
   const [products, setProducts] = useState([])
+  const [branches, setBranches] = useState([])
+  const currentBranch = branches.find((b) => b.id === selectedBranchId)
   const [filters, setFilters] = useState({ from: '', to: '', productId: '' })
   const requestKey = JSON.stringify({ activeReport, selectedBranchId, filters, reloadKey, page })
   const currentResult = reportResult?.key === requestKey ? reportResult : null
@@ -60,6 +63,16 @@ export default function ReportsView() {
   }, [activeReport, selectedBranchId, filters, reloadKey, requestKey, page])
 
   useEffect(() => { setPage(1) }, [selectedBranchId])
+
+  useEffect(() => {
+    let active = true
+    api.get('/branches')
+      .then((res) => {
+        if (active) setBranches(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -206,12 +219,43 @@ export default function ReportsView() {
       </div>
       {/* Summary KPI Cards if applicable */}
       {activeReport === 'balance' && (summary?.totalValuation !== undefined || summary?.stockValue !== undefined) && user?.role !== 'STAFF' && (
-        <div className="rounded-2xl border border-slate-200 bg-linear-to-r from-blue-900 to-indigo-900 p-6 text-white shadow-soft flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-blue-200 font-bold">{t('reports.totalValue')}</p>
-            <p className="text-3xl font-extrabold mt-1">{formatETB(summary.totalValuation ?? summary.stockValue, i18n.language)}</p>
+        <div
+          className="rounded-2xl p-6 text-white shadow-soft transition-all"
+          style={{
+            background: 'linear-gradient(135deg, #164E63 0%, #0F766E 50%, #159A80 100%)',
+            border: '1px solid rgba(15, 118, 110, 0.4)',
+          }}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider font-bold text-[#DCEEF1]">
+                {t('reports.totalValue')}
+              </p>
+              <p className="text-3xl sm:text-4xl font-extrabold text-[#FFFFFF] mt-1.5 tracking-tight">
+                {formatETB(summary.totalValuation ?? summary.stockValue, i18n.language)}
+              </p>
+            </div>
+            <Boxes className="h-10 w-10 text-[#A5DCD5]/30 hidden sm:block shrink-0" />
           </div>
-          <Boxes className="h-12 w-12 text-blue-300 opacity-60" />
+
+          <div
+            className="my-3.5 border-t"
+            style={{ borderColor: 'rgba(255, 255, 255, 0.33)' }}
+          />
+
+          <div className="flex items-center gap-2 text-xs font-medium text-[#DCEEF1]">
+            <TrendingUp className="h-4 w-4 text-[#A5DCD5] shrink-0" />
+            <span>
+              {currentBranch
+                ? t('reports.inventoryForBranch', {
+                    branch: currentBranch.name,
+                    defaultValue: `Inventory for ${currentBranch.name}`,
+                  })
+                : t('reports.inventoryAllBranches', {
+                    defaultValue: 'Inventory across all branches',
+                  })}
+            </span>
+          </div>
         </div>
       )}
 
