@@ -207,9 +207,9 @@
     "importDescription": "Download the template, fill it in, then preview the CSV before confirming. Invalid rows will be skipped.",
     "downloadTemplate": "Download CSV template",
     "chooseCsv": "Choose a CSV file to preview",
-    "openingStockBranch": "Branch for opening stock (optional)",
+    "openingStockBranch": "Branch for opening stock *",
     "noOpeningStock": "No opening stock",
-    "selectOpeningBranch": "Select a branch to import rows with opening stock, then choose the file again to preview.",
+    "selectOpeningBranch": "Select a branch to import rows with opening stock.",
     "importCounts": "{{total}} rows · {{valid}} valid · {{invalid}} invalid",
     "csvRow": "Row {{row}}",
     "csvProductSummary": "Name: {{name}} · SKU: {{sku}} · Category: {{category}}",
@@ -219,7 +219,12 @@
     "importComplete": "Import complete: {{imported}} imported, {{skipped}} skipped.",
     "importError": "CSV import failed. Check the file and try again.",
     "templateError": "CSV template could not be downloaded. Please try again.",
-    "selectUnit": "Select a unit"
+    "selectUnit": "Select a unit",
+    "selectBranch": "Select a branch *",
+    "dragOrBrowse": "Drag & drop your CSV file here, or browse",
+    "dropFileHere": "Drop the CSV file here",
+    "csvOnlyHint": "Supports standard CSV format (.csv)",
+    "onlyCsvSupported": "Only CSV files are supported (.csv)"
   },
   "stock": {
     "title": "Stock Overview",
@@ -304,7 +309,8 @@
     "date": "Date",
     "printInvoice": "Print Invoice",
     "items": "Items",
-    "cashier": "Cashier"
+    "cashier": "Cashier",
+    "autoSelecting": "Auto-selecting {{branch}} in {{seconds}}s"
   },
   "returns": {
     "title": "Customer Returns & Refunds",
@@ -809,7 +815,10 @@
     "profile": "View profile",
     "primaryNavigation": "Main navigation",
     "moreModules": "More modules",
-    "profileOption": "Profile"
+    "profileOption": "Profile",
+    "openMenu": "Open menu",
+    "menu": "Menu",
+    "welcomeUser": "Welcome {{name}}!"
   },
   "calendar": {
     "months": [

@@ -207,9 +207,9 @@
     "importDescription": "የ CSV አብነቱን ያውርዱ፣ ይሙሉት እና ከማረጋገጥዎ በፊት ይመልከቱት። የተሳሳቱ ረድፎች ይዘለላሉ።",
     "downloadTemplate": "የ CSV አብነት አውርድ",
     "chooseCsv": "ለቅድመ እይታ የ CSV ፋይል ይምረጡ",
-    "openingStockBranch": "ለመነሻ ክምችት ቅርንጫፍ (አማራጭ)",
+    "openingStockBranch": "ለመነሻ ክምችት ቅርንጫፍ *",
     "noOpeningStock": "መነሻ ክምችት የለም",
-    "selectOpeningBranch": "መነሻ ክምችት ላላቸው ረድፎች ቅርንጫፍ ይምረጡ፣ ከዚያ ፋይሉን እንደገና ለቅድመ እይታ ይምረጡ።",
+    "selectOpeningBranch": "የመነሻ ክምችት ለማስገባት እባክዎ ቅርንጫፍ ይምረጡ።",
     "importCounts": "{{total}} ረድፎች · {{valid}} ትክክለኛ · {{invalid}} ልክ ያልሆኑ",
     "csvRow": "ረድፍ {{row}}",
     "csvProductSummary": "ስም፦ {{name}} · SKU፦ {{sku}} · ምድብ፦ {{category}}",
@@ -219,7 +219,12 @@
     "importComplete": "ማስመጣቱ ተጠናቋል፦ {{imported}} ገብተዋል፣ {{skipped}} ተዘልለዋል።",
     "importError": "CSV ማስመጣት አልተሳካም። ፋይሉን ያረጋግጡና እንደገና ይሞክሩ።",
     "templateError": "የ CSV አብነቱን ማውረድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-    "selectUnit": "መለኪያ ይምረጡ"
+    "selectUnit": "መለኪያ ይምረጡ",
+    "selectBranch": "ቅርንጫፍ ይምረጡ *",
+    "dragOrBrowse": "የCSV ፋይልዎን እዚህ ይጎትቱ እና ይጣሉ፣ ወይም ይምረጡ",
+    "dropFileHere": "የCSV ፋይሉን እዚህ ይጣሉ",
+    "csvOnlyHint": "መደበኛ የCSV ቅርጸት ይደግፋል (.csv)",
+    "onlyCsvSupported": "የCSV ፋይሎች ብቻ ይደገፋሉ (.csv)"
   },
   "stock": {
     "title": "የክምችት አጠቃላይ እይታ",
@@ -307,7 +312,8 @@
     "date": "ቀን",
     "printInvoice": "ደረሰኝ አትም",
     "items": "ዕቃዎች",
-    "cashier": "ገንዘብ ተቀባይ"
+    "cashier": "ገንዘብ ተቀባይ",
+    "autoSelecting": "በ{{seconds}} ሰከንድ ውስጥ {{branch}} በራስ-ሰር ይመረጣል"
   },
   "returns": {
     "title": "የተመለሱ ዕቃዎች እና ተመላሽ ገንዘብ",
@@ -812,7 +818,10 @@
     "profile": "መገለጫን ይመልከቱ",
     "primaryNavigation": "ዋና ማውጫ",
     "moreModules": "ተጨማሪ ክፍሎች",
-    "profileOption": "መገለጫ"
+    "profileOption": "መገለጫ",
+    "openMenu": "የማውጫ ምናሌ ክፈት",
+    "menu": "ምናሌ",
+    "welcomeUser": "እንኳን ደህና መጡ {{name}}!"
   },
   "calendar": {
     "months": [
