@@ -128,8 +128,23 @@ export default function LandingPage() {
 
       <footer className="mt-auto border-t border-slate-200 bg-white py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 text-sm text-slate-500">
-          <div className="flex items-center gap-2 font-bold text-slate-800"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white"><Boxes className="h-5 w-5" aria-hidden="true" /></span><span>{t('app.name')}</span></div>
-          <p>© 2026 {t('app.name')}. {t('landing.footerText')}</p>
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white">
+              <Boxes className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span>{t('app.name')}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 sm:items-end text-xs sm:text-sm">
+            <p>© 2026 {t('app.name')}. {t('landing.footerText')}</p>
+            <a
+              href="https://elvora-technologies.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-slate-800 hover:text-blue-600 hover:underline transition-colors"
+            >
+              {t('landing.developedBy', { defaultValue: 'Developed by Elvora Technologies' })}
+            </a>
+          </div>
         </div>
       </footer>
     </div>

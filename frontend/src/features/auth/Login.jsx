@@ -74,7 +74,19 @@ export default function Login() {
           <h2 className="text-4xl font-extrabold leading-tight text-white">{t('app.tagline')}</h2>
           <p className="text-slate-300 leading-relaxed text-sm">{t('auth.loginDescription')}</p>
         </div>
-        <div className="text-xs text-slate-400">© 2026 {t('app.name')}. {t('landing.footerText')}</div>
+        <div className="text-xs text-slate-400 space-y-0.5">
+          <div>© 2026 {t('app.name')}. {t('landing.footerText')}</div>
+          <div>
+            <a
+              href="https://elvora-technologies.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-slate-500 hover:text-slate-300 hover:underline transition-colors cursor-pointer"
+            >
+              {t('landing.developedBy', { defaultValue: 'Developed by Elvora Technologies' })}
+            </a>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col justify-between p-6 sm:p-12">
@@ -134,7 +146,19 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="text-center text-xs text-slate-400">{t('app.name')} · {t('app.subtitle')}</div>
+        <div className="text-center text-xs text-slate-400">
+          <div>{t('app.name')} · {t('app.subtitle')}</div>
+          <div className="mt-1 lg:hidden">
+            <a
+              href="https://elvora-technologies.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-slate-500 hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+            >
+              {t('landing.developedBy', { defaultValue: 'Developed by Elvora Technologies' })}
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   )
