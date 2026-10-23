@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { useAuth } from '../../features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
@@ -24,6 +24,9 @@ export default function AppLayout() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [ethDate, setEthDate] = useState(null)
   const [notificationError, setNotificationError] = useState('')
+
+  const location = useLocation()
+  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/'
 
   // First name extraction for "Welcome [FirstName] !"
   const firstName = user?.fullName?.split(' ')[0] || user?.username || ''
@@ -109,9 +112,11 @@ export default function AppLayout() {
               <Menu className="h-5 w-5" />
             </button>
 
-            <h1 className="text-xl sm:text-2xl font-bold text-[#15343f] tracking-tight whitespace-nowrap">
-              {t('shell.welcome', { name: firstName })}
-            </h1>
+            {isDashboard && (
+              <h1 className="text-xl sm:text-2xl font-bold text-[#15343f] tracking-tight whitespace-nowrap">
+                {t('shell.welcome', { name: firstName })}
+              </h1>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
