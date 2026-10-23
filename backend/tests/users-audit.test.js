@@ -91,17 +91,17 @@ test('a PATCH that changes nothing writes no audit entry', async () => {
   expect(await entriesFor(user.id, 'USER_UPDATED')).toHaveLength(0);
 });
 
-test('changing a user to Admin logs the role change and the cleared branch', async () => {
+test('changing a user to Auditor logs the role change and the cleared branch', async () => {
   const user = await newUser();
 
-  const res = await adminPatch(`/api/users/${user.id}`, { role: 'ADMIN' });
+  const res = await adminPatch(`/api/users/${user.id}`, { role: 'AUDITOR' });
   expect(res.status).toBe(200);
   expect(res.body.branchId).toBeNull();
 
   const entries = await entriesFor(user.id, 'USER_UPDATED');
   expect(entries).toHaveLength(1);
   expect(entries[0].oldValue).toEqual({ role: 'STAFF', branchId: branch.id });
-  expect(entries[0].newValue).toEqual({ role: 'ADMIN', branchId: null });
+  expect(entries[0].newValue).toEqual({ role: 'AUDITOR', branchId: null });
   expect(entries[0].branchId).toBeNull(); // the user's branch after the change
 });
 

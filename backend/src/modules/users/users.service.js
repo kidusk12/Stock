@@ -49,6 +49,54 @@ function checkBranchRule(role, branchId) {
   }
 }
 
+// Single-Admin rule (T1): only one ADMIN may exist in the system (the seeded one).
+// This check must run BEFORE checkBranchRule so the error field is always 'role'.
+function assertCanCreateRole(role) {
+  if (role === 'ADMIN') {
+    throw validationError(
+      'Additional Admin accounts cannot be created',
+      'role', 'invalid',
+      'only one ADMIN is allowed; use BRANCH_MANAGER, STAFF or AUDITOR'
+    );
+  }
+}
+
+// For PATCH: guard changes to an existing user's role or isActive against the single-admin rule.
+// - No user may be promoted to ADMIN.
+// - The ADMIN user's role may not be changed (unless patching ADMIN→ADMIN, which is a no-op).
+// - The ADMIN user may not be deactivated.
+function assertAdminUpdateRules(existing, changes) {
+  const incomingRole = changes.role;
+
+  // Promote someone else to ADMIN
+  if (existing.role !== 'ADMIN' && incomingRole === 'ADMIN') {
+    throw validationError(
+      'A user cannot be promoted to Admin',
+      'role', 'invalid',
+      'there is only one Admin; promotion is not allowed'
+    );
+  }
+
+  if (existing.role === 'ADMIN') {
+    // Demote the Admin (patching role to something other than ADMIN)
+    if (incomingRole !== undefined && incomingRole !== 'ADMIN') {
+      throw validationError(
+        'The Admin role cannot be changed',
+        'role', 'invalid',
+        'the seeded Admin must keep the ADMIN role'
+      );
+    }
+    // Deactivate the Admin
+    if (changes.isActive === false) {
+      throw validationError(
+        'The Admin account cannot be deactivated',
+        'isActive', 'invalid',
+        'the seeded Admin must remain active'
+      );
+    }
+  }
+}
+
 async function assertBranchExists(branchId) {
   const branch = await prisma.branch.findUnique({ where: { id: branchId }, select: { id: true } });
   if (!branch) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
@@ -103,6 +151,8 @@ async function getById(idParam) {
 // POST /api/users
 // The user and the USER_CREATED audit entry are saved in one transaction.
 async function create({ username, fullName, password, role, branchId = null }, actingUserId) {
+  // Single-admin rule first so the error always points at 'role', not 'branchId'
+  assertCanCreateRole(role);
   checkBranchRule(role, branchId);
   if (branchId !== null) await assertBranchExists(branchId);
 
@@ -144,6 +194,9 @@ async function update(idParam, changes, actingUserId) {
   if (changes.isActive === false && id === actingUserId) {
     throw validationError('You cannot deactivate your own account', 'isActive', 'invalid', 'not allowed on your own account');
   }
+
+  // Single-admin rule: must run before checkBranchRule so field is always 'role' / 'isActive'
+  assertAdminUpdateRules(existing, changes);
 
   const role = changes.role !== undefined ? changes.role : existing.role;
   let branchId = changes.branchId !== undefined ? changes.branchId : existing.branchId;
