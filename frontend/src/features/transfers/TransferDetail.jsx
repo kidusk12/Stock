@@ -28,13 +28,18 @@ export default function TransferDetail() {
   const [actionError, setActionError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [showReceiveForm, setShowReceiveForm] = useState(false)
+  const [receiveQuantities, setReceiveQuantities] = useState({})
   const [rejectReason, setRejectReason] = useState('')
 
   const loadTransfer = useCallback(() => {
     setLoading(true)
     setError('')
     api.get(`/transfers/${transferId}`)
-      .then(setTransfer)
+      .then((nextTransfer) => {
+        setTransfer(nextTransfer)
+        setReceiveQuantities(Object.fromEntries((nextTransfer.items || []).map((item) => [item.productId, String(item.quantity)])))
+      })
       .catch((err) => setError(t(`errors.${err.code}`, { defaultValue: t('transfers.detailLoadError') })))
       .finally(() => setLoading(false))
   }, [transferId, t])
@@ -47,6 +52,7 @@ export default function TransferDetail() {
     try {
       await api.post(`/transfers/${transferId}/${action}`, body)
       setShowRejectForm(false)
+      setShowReceiveForm(false)
       setRejectReason('')
       loadTransfer()
     } catch (err) {
@@ -59,6 +65,15 @@ export default function TransferDetail() {
   const submitReject = (event) => {
     event.preventDefault()
     performAction('reject', { reason: rejectReason.trim() || undefined })
+  }
+
+  const submitReceipt = (event) => {
+    event.preventDefault()
+    const items = (transfer.items || []).map((item) => ({
+      productId: Number(item.productId),
+      quantity: Number(receiveQuantities[item.productId]),
+    }))
+    performAction('receive', { items })
   }
 
   if (loading) return <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{t('common.loading')}</div>
@@ -130,7 +145,10 @@ export default function TransferDetail() {
             </tr></thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {(transfer.items || []).map((item) => <tr key={item.id || item.productId}>
-                <td className="px-5 py-3 font-semibold text-slate-900">{item.productName || item.product?.name || '—'}</td>
+                <td className="px-5 py-3 font-semibold text-slate-900">{item.productName || item.product?.name || '—'}
+                  {transfer.status === 'RECEIVED' && item.receivedQuantity != null && <div className="mt-1 text-xs font-normal text-slate-600">{t('transfers.receivedQuantityValue', { quantity: item.receivedQuantity })}</div>}
+                  {transfer.status === 'RECEIVED' && item.discrepancyQuantity !== 0 && item.discrepancyQuantity != null && <div role="status" className="mt-1 text-xs font-semibold text-amber-800">{t('transfers.receiptDiscrepancyLine', { shipped: item.quantity, received: item.receivedQuantity, difference: item.discrepancyQuantity })}</div>}
+                </td>
                 <td className="px-5 py-3 font-mono text-xs">{item.sku || item.product?.sku || '—'}</td>
                 <td className="px-5 py-3 text-right tabular-nums">{item.quantity}</td>
               </tr>)}
@@ -154,7 +172,18 @@ export default function TransferDetail() {
         {canApprove && <button type="button" disabled={actionLoading} onClick={() => performAction('approve')} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">{actionLoading ? t('common.loading') : t('transfers.approve')}</button>}
         {canApprove && !showRejectForm && <button type="button" disabled={actionLoading} onClick={() => setShowRejectForm(true)} className="rounded-xl border border-red-300 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">{t('transfers.reject')}</button>}
         {canShip && <button type="button" disabled={actionLoading} onClick={() => performAction('ship')} className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50"><Truck className="h-4 w-4" aria-hidden="true" />{actionLoading ? t('common.loading') : t('transfers.ship')}</button>}
-        {canReceive && <button type="button" disabled={actionLoading} onClick={() => performAction('receive')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{actionLoading ? t('common.loading') : t('transfers.confirmReceipt')}</button>}
+        {canReceive && !showReceiveForm && <button type="button" disabled={actionLoading} onClick={() => setShowReceiveForm(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{t('transfers.confirmReceipt')}</button>}
+        {showReceiveForm && canReceive && <form onSubmit={submitReceipt} className="w-full space-y-3 border-t border-slate-200 pt-4">
+          <p className="text-sm text-slate-600">{t('transfers.receiveHelp')}</p>
+          {(transfer.items || []).map((item) => <label key={item.id || item.productId} className="flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+            <span>{item.productName || item.product?.name || '—'} <span className="font-normal text-slate-500">({t('transfers.shippedQuantityValue', { quantity: item.quantity })})</span></span>
+            <input type="number" min="0" step="0.01" required value={receiveQuantities[item.productId] ?? ''} aria-label={t('transfers.receivedQuantityFor', { product: item.productName || item.product?.name || '' })} onChange={(event) => setReceiveQuantities((previous) => ({ ...previous, [item.productId]: event.target.value }))} className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-right tabular-nums" />
+          </label>)}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setShowReceiveForm(false)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">{t('common.cancel')}</button>
+            <button type="submit" disabled={actionLoading} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{actionLoading ? t('common.loading') : t('transfers.confirmReceipt')}</button>
+          </div>
+        </form>}
         {showRejectForm && canApprove && <form onSubmit={submitReject} className="flex w-full flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-end">
           <label className="flex-1 text-sm font-semibold text-slate-700">{t('transfers.rejectReason')}
             <textarea rows="2" maxLength={300} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder={t('transfers.rejectReasonPlaceholder')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />

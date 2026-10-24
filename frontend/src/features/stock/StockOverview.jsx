@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Archive, Clock3, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
-import { formatDate } from '../../lib/ethiopianDate'
+import { formatDate, formatETB } from '../../lib/ethiopianDate'
 
 const LIMIT = 20
 
@@ -21,6 +21,8 @@ export default function StockOverview() {
   const [consolidated, setConsolidated] = useState(false)
   const [productId, setProductId] = useState('')
   const [movementType, setMovementType] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(1)
@@ -32,16 +34,17 @@ export default function StockOverview() {
   const [saving, setSaving] = useState(false)
 
   const canSetThreshold = ['ADMIN', 'BRANCH_MANAGER'].includes(user?.role)
+  const isConsolidated = consolidated && !selectedBranchId
 
   const loadStock = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const result = await api.get(consolidated && !selectedBranchId ? '/stock/consolidated' : '/stock', {
+      const result = await api.get(isConsolidated ? '/stock/consolidated' : '/stock', {
         branchId: selectedBranchId || undefined,
         categoryId: categoryId || undefined,
         q: query.trim() || undefined,
-        lowOnly: !consolidated && lowOnly ? true : undefined,
+        lowOnly: !isConsolidated && lowOnly ? true : undefined,
         page,
         limit: LIMIT,
       })
@@ -53,7 +56,7 @@ export default function StockOverview() {
     } finally {
       setLoading(false)
     }
-  }, [categoryId, consolidated, lowOnly, page, query, selectedBranchId, t])
+  }, [categoryId, isConsolidated, lowOnly, page, query, selectedBranchId, t])
 
   const loadMovements = useCallback(async () => {
     setLoading(true)
@@ -63,6 +66,8 @@ export default function StockOverview() {
         branchId: selectedBranchId || undefined,
         productId: productId || undefined,
         type: movementType || undefined,
+        from: fromDate || undefined,
+        to: toDate || undefined,
         page,
         limit: LIMIT,
       })
@@ -74,18 +79,30 @@ export default function StockOverview() {
     } finally {
       setLoading(false)
     }
-  }, [movementType, page, productId, selectedBranchId, t])
+  }, [fromDate, movementType, page, productId, selectedBranchId, t, toDate])
 
   useEffect(() => {
     api.get('/categories').then((result) => setCategories(result.data || [])).catch(() => {})
-    api.get('/products', { limit: 100 }).then((result) => setProducts(result.data || [])).catch(() => {})
+    let cancelled = false
+    const loadAllProducts = async () => {
+      try {
+        const firstPage = await api.get('/products', { page: 1, limit: 100 })
+        const pageCount = Math.ceil((firstPage.total || 0) / (firstPage.limit || 100))
+        const remainingPages = await Promise.all(Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
+          api.get('/products', { page: index + 2, limit: 100 })
+        ))
+        if (!cancelled) setProducts([...(firstPage.data || []), ...remainingPages.flatMap((result) => result.data || [])])
+      } catch {
+        if (!cancelled) setProducts([])
+      }
+    }
+    void loadAllProducts()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
-    if (selectedBranchId) setConsolidated(false)
-  }, [selectedBranchId])
-
-  useEffect(() => {
+    // Start the API request from the effect; loadStock/loadMovements update state when the request settles.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'levels') void loadStock()
     else void loadMovements()
   }, [tab, loadStock, loadMovements])
@@ -142,7 +159,7 @@ export default function StockOverview() {
         </button>
       </div>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center">
         {tab === 'levels' ? <label className="relative min-w-0 flex-1">
           <span className="sr-only">{t('stock.search')}</span>
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden="true" />
@@ -150,10 +167,12 @@ export default function StockOverview() {
         </label> : <>
           <label><span className="sr-only">{t('stock.product')}</span><select value={productId} onChange={resetFilters(setProductId)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:w-60"><option value="">{t('stock.allProducts')}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}</select></label>
           <label><span className="sr-only">{t('stock.type')}</span><select value={movementType} onChange={resetFilters(setMovementType)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:w-52"><option value="">{t('stock.allTypes')}</option>{['OPENING_STOCK', 'PURCHASE_RECEIPT', 'SALE', 'CUSTOMER_RETURN', 'ADJUSTMENT', 'TRANSFER_OUT', 'TRANSFER_IN'].map((type) => <option key={type} value={type}>{t(`status.${type}`, { defaultValue: type })}</option>)}</select></label>
+          <label className="min-w-36 flex-1"><span className="sr-only">{t('stock.from')}</span><input type="date" aria-label={t('stock.from')} value={fromDate} max={toDate || undefined} onChange={resetFilters(setFromDate)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
+          <label className="min-w-36 flex-1"><span className="sr-only">{t('stock.to')}</span><input type="date" aria-label={t('stock.to')} value={toDate} min={fromDate || undefined} onChange={resetFilters(setToDate)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
         </>}
         {tab === 'levels' && <>
           <label><span className="sr-only">{t('stock.category')}</span><select value={categoryId} onChange={resetFilters(setCategoryId)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:w-52"><option value="">{t('stock.allCategories')}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-          {!consolidated && <label className="flex shrink-0 items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={lowOnly} onChange={(event) => { setLowOnly(event.target.checked); setPage(1) }} className="rounded border-slate-300 text-teal-700 focus:ring-teal-600" />{t('stock.lowOnly')}</label>}
+          {!isConsolidated && <label className="flex shrink-0 items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={lowOnly} onChange={(event) => { setLowOnly(event.target.checked); setPage(1) }} className="rounded border-slate-300 text-teal-700 focus:ring-teal-600" />{t('stock.lowOnly')}</label>}
           {['ADMIN', 'AUDITOR'].includes(user?.role) && !selectedBranchId && <label className="flex shrink-0 items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={consolidated} onChange={(event) => { setConsolidated(event.target.checked); setLowOnly(false); setPage(1) }} className="rounded border-slate-300 text-teal-700 focus:ring-teal-600" />{t('stock.consolidated')}</label>}
         </>}
       </section>
@@ -164,15 +183,15 @@ export default function StockOverview() {
         <div className="overflow-x-auto">
           {tab === 'levels' ? <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-600"><tr>
-              <th className="px-4 py-3">{t('products.name')}</th><th className="px-4 py-3">{t('products.sku')}</th>{!consolidated && <><th className="px-4 py-3">{t('stock.category')}</th><th className="px-4 py-3">{t('stock.branch')}</th></>}<th className="px-4 py-3 text-right">{consolidated ? t('stock.totalQuantity') : t('stock.quantity')}</th>{!consolidated && <><th className="px-4 py-3 text-right">{t('stock.minimum')}</th><th className="px-4 py-3 text-right">{t('stock.maximum')}</th></>}{consolidated ? <th className="px-4 py-3">{t('stock.branchBreakdown')}</th> : user?.role !== 'STAFF' && <th className="px-4 py-3 text-right">{t('stock.value')}</th>}{!consolidated && canSetThreshold && <th className="px-4 py-3 text-right">{t('common.actions')}</th>}
+              <th className="px-4 py-3">{t('products.name')}</th><th className="px-4 py-3">{t('products.sku')}</th>{!isConsolidated && <><th className="px-4 py-3">{t('stock.category')}</th><th className="px-4 py-3">{t('stock.branch')}</th></>}<th className="px-4 py-3 text-right">{isConsolidated ? t('stock.totalQuantity') : t('stock.quantity')}</th>{!isConsolidated && <><th className="px-4 py-3 text-right">{t('stock.minimum')}</th><th className="px-4 py-3 text-right">{t('stock.maximum')}</th></>}{isConsolidated ? <th className="px-4 py-3">{t('stock.branchBreakdown')}</th> : user?.role !== 'STAFF' && <th className="px-4 py-3 text-right">{t('stock.value')}</th>}{!isConsolidated && canSetThreshold && <th className="px-4 py-3 text-right">{t('common.actions')}</th>}
             </tr></thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {loading ? <tr><td colSpan={consolidated ? 4 : canSetThreshold ? 9 : user?.role === 'STAFF' ? 7 : 8} className="py-12 text-center text-slate-500" role="status">{t('common.loading')}</td></tr>
-                : rows.length === 0 ? <tr><td colSpan={consolidated ? 4 : canSetThreshold ? 9 : user?.role === 'STAFF' ? 7 : 8} className="py-12 text-center text-slate-500">{t('stock.empty')}</td></tr>
+              {loading ? <tr><td colSpan={isConsolidated ? 4 : canSetThreshold ? 9 : user?.role === 'STAFF' ? 7 : 8} className="py-12 text-center text-slate-500" role="status">{t('common.loading')}</td></tr>
+                : rows.length === 0 ? <tr><td colSpan={isConsolidated ? 4 : canSetThreshold ? 9 : user?.role === 'STAFF' ? 7 : 8} className="py-12 text-center text-slate-500">{t('stock.empty')}</td></tr>
                   : rows.map((row) => {
                     const low = row.minQuantity > 0 && row.quantity <= row.minQuantity
-                    return <tr key={consolidated ? row.productId : `${row.branchId}-${row.productId}`} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-semibold text-slate-900">{row.productName}</td><td className="px-4 py-3 font-mono text-xs">{row.sku}</td>{!consolidated && <><td className="px-4 py-3">{row.categoryName}</td><td className="px-4 py-3">{row.branchName}</td></>}<td className="px-4 py-3 text-right font-bold"><span className={low ? 'text-red-700' : ''}>{consolidated ? row.totalQuantity : row.quantity}</span></td>{!consolidated && <><td className="px-4 py-3 text-right">{row.minQuantity}</td><td className="px-4 py-3 text-right">{row.maxQuantity ?? t('stock.notSet')}</td></>}{consolidated ? <td className="px-4 py-3">{(row.branches || []).map((branch) => `${branch.branchName}: ${branch.quantity}`).join(' · ')}</td> : user?.role !== 'STAFF' && <td className="px-4 py-3 text-right">{row.stockValue == null ? t('stock.notAvailable') : `${Number(row.stockValue).toLocaleString(i18n.language)} ETB`}</td>}{!consolidated && canSetThreshold && <td className="px-4 py-3 text-right"><button type="button" onClick={() => openThresholdEditor(row)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-teal-800 hover:bg-teal-50"><SlidersHorizontal className="h-4 w-4" aria-hidden="true" />{t('stock.setThreshold')}</button></td>}
+                    return <tr key={isConsolidated ? row.productId : `${row.branchId}-${row.productId}`} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{row.productName}</td><td className="px-4 py-3 font-mono text-xs">{row.sku}</td>{!isConsolidated && <><td className="px-4 py-3">{row.categoryName}</td><td className="px-4 py-3">{row.branchName}</td></>}<td className="px-4 py-3 text-right font-bold"><span className={low ? 'text-red-700' : ''}>{isConsolidated ? row.totalQuantity : row.quantity}</span></td>{!isConsolidated && <><td className="px-4 py-3 text-right">{row.minQuantity}</td><td className="px-4 py-3 text-right">{row.maxQuantity ?? t('stock.notSet')}</td></>}{isConsolidated ? <td className="px-4 py-3">{(row.branches || []).map((branch) => `${branch.branchName}: ${branch.quantity}`).join(' · ')}</td> : user?.role !== 'STAFF' && <td className="px-4 py-3 text-right">{row.stockValue == null ? t('stock.notAvailable') : formatETB(row.stockValue, i18n.language)}</td>}{!isConsolidated && canSetThreshold && <td className="px-4 py-3 text-right"><button type="button" onClick={() => openThresholdEditor(row)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-teal-800 hover:bg-teal-50"><SlidersHorizontal className="h-4 w-4" aria-hidden="true" />{t('stock.setThreshold')}</button></td>}
                     </tr>
                   })}
             </tbody>

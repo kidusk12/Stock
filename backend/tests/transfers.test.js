@@ -177,6 +177,7 @@ test('a request returns the contract object, checks no stock, and writes a TRANS
   const res = await fromAtoB([line(ids.pFlow, 999)], { note: '  Urgent  ' }); // far more than A has: no check now
   expect(res.status).toBe(201);
   expect(res.body).toMatchObject({
+    transferNumber: `TRF-${String(res.body.id).padStart(6, '0')}`,
     fromBranchId: ids.A,
     fromBranchName: `${prefix} Branch A`,
     toBranchId: ids.B,
@@ -195,7 +196,7 @@ test('a request returns the contract object, checks no stock, and writes a TRANS
     receivedAt: null,
   });
   expect(res.body.requestedAt).toBeTruthy();
-  expect(res.body.items).toEqual([{ productId: ids.pFlow, productName: `${prefix} Flow`, quantity: 999 }]);
+  expect(res.body.items).toEqual([{ productId: ids.pFlow, productName: `${prefix} Flow`, sku: `TRT-${stamp}-Flow`, quantity: 999 }]);
 
   expect(await stockOf(ids.pFlow, ids.A)).toBe(10);
   expect(await stockOf(ids.pFlow, ids.B)).toBe(2);
@@ -309,7 +310,37 @@ test('full workflow: request, approve, ship, receive, with stock, movements and 
   expect(audit[1].oldValue).toEqual({ status: 'REQUESTED' });
   expect(audit[1].newValue).toEqual({ status: 'APPROVED' });
   expect(audit[3].oldValue).toEqual({ status: 'SHIPPED' });
-  expect(audit[3].newValue).toEqual({ status: 'RECEIVED' });
+  expect(audit[3].newValue).toEqual({
+    status: 'RECEIVED',
+    items: [{ productId: ids.pFlow, shippedQuantity: 4, receivedQuantity: 4, discrepancyQuantity: 0 }],
+  });
+});
+
+test('receiving per-item quantities adds only what arrived and records a visible discrepancy', async () => {
+  const sourceBefore = await stockOf(ids.pFlow, ids.A);
+  const destinationBefore = await stockOf(ids.pFlow, ids.B);
+  const created = await fromAtoB([line(ids.pFlow, 4)]);
+  const id = created.body.id;
+  expect((await act(tokens.managerA, id, 'approve')).status).toBe(200);
+  expect((await act(tokens.staffA, id, 'ship')).status).toBe(200);
+
+  const received = await act(tokens.staffB, id, 'receive', { items: [{ productId: ids.pFlow, quantity: 3 }] });
+  expect(received.status).toBe(200);
+  expect(received.body.items).toEqual([
+    expect.objectContaining({ productId: ids.pFlow, quantity: 4, receivedQuantity: 3, discrepancyQuantity: -1 }),
+  ]);
+  expect(await stockOf(ids.pFlow, ids.A)).toBe(sourceBefore - 4);
+  expect(await stockOf(ids.pFlow, ids.B)).toBe(destinationBefore + 3);
+
+  const movement = await prisma.stockMovement.findFirst({
+    where: { referenceType: 'TRANSFER', referenceId: id, type: 'TRANSFER_IN' },
+  });
+  expect(movement.quantityChange.toNumber()).toBe(3);
+  expect(movement.reason).toContain('Receipt discrepancy');
+  const audit = await prisma.auditLog.findFirst({ where: { entityType: 'TRANSFER', entityId: id, action: 'TRANSFER_RECEIVED' } });
+  expect(audit.newValue.items).toEqual([
+    { productId: ids.pFlow, shippedQuantity: 4, receivedQuantity: 3, discrepancyQuantity: -1 },
+  ]);
 });
 
 test('reject: reason rules, final status, no stock change, TRANSFER_REJECTED audit entry', async () => {
@@ -536,7 +567,7 @@ test('GET /api/transfers/:id returns the transfer with items; only the two branc
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(t.id);
     expect(res.body.status).toBe('REQUESTED');
-    expect(res.body.items).toEqual([{ productId: ids.pList, productName: `${prefix} List`, quantity: 2 }]);
+    expect(res.body.items).toEqual([{ productId: ids.pList, productName: `${prefix} List`, sku: `TRT-${stamp}-List`, quantity: 2 }]);
   }
 
   expectError(await get(tokens.managerD, url), 403, 'FORBIDDEN');

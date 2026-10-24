@@ -3,6 +3,8 @@ const { z } = require('zod');
 const controller = require('./sales.controller');
 const { requireRole, assertBranchAccess } = require('../../middleware/auth');
 const { validate } = require('../../middleware/validate');
+const { createSchema: createReturnSchema, checkSaleBranch } = require('../returns/returns.routes');
+const returnsController = require('../returns/returns.controller');
 
 // Quantity: above 0, at most 2 decimals (the database column is Decimal(12,2))
 const quantity = z
@@ -40,6 +42,7 @@ const router = express.Router();
 router.use(requireRole('ADMIN', 'BRANCH_MANAGER', 'STAFF'));
 
 router.post('/', checkBranch, validate(createSchema), controller.createSale);
+router.post('/:id/returns', checkSaleBranch, validate(createReturnSchema), returnsController.create);
 router.get('/', controller.listSales);
 router.get('/:id', controller.getSale);
 

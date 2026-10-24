@@ -402,6 +402,7 @@ test('low-stock list is calculated from current stock, not notifications', async
     branchId: ids.A,
     branchName: `${prefix} Branch A`,
     productName: `${prefix} LowA`,
+    sku: `NT-${stamp}-LowA`,
     quantity: 3,
     minQuantity: 5,
     maxQuantity: 20,

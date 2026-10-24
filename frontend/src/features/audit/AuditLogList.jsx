@@ -12,14 +12,14 @@ const ENTITY_TYPES = ['USER', 'PRODUCT', 'SUPPLIER', 'BRANCH', 'PO', 'SALE', 'RE
 const ACTIONS = [
   'USER_CREATED', 'USER_UPDATED', 'USER_LOGOUT',
   'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRICE_CHANGED',
-  'SUPPLIER_UPDATED', 'BRANCH_UPDATED', 'STOCK_MOVEMENT',
+  'SUPPLIER_UPDATED', 'BRANCH_UPDATED',
   'PO_CREATED', 'PO_APPROVED', 'PO_REJECTED', 'PO_RECEIVED',
   'SALE_CREATED', 'RETURN_CREATED', 'RETURN_REFUNDED', 'ADJUSTMENT_CREATED',
   'TRANSFER_REQUESTED', 'TRANSFER_APPROVED', 'TRANSFER_REJECTED', 'TRANSFER_SHIPPED', 'TRANSFER_RECEIVED',
   'IMPORT_CONFIRMED',
 ]
 
-const EMPTY_FILTERS = { userId: '', entityType: '', action: '', productText: '', from: '', to: '' }
+const EMPTY_FILTERS = { userId: '', entityType: '', entityId: '', action: '', productText: '', from: '', to: '' }
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -58,7 +58,7 @@ export default function AuditLogList() {
 
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [filterError, setFilterError] = useState('')
-  const appliedRef = useRef({ userId: '', entityType: '', action: '', productId: '', from: '', to: '' })
+  const appliedRef = useRef({ userId: '', entityType: '', entityId: '', action: '', productId: '', from: '', to: '' })
 
   const [knownUsers, setKnownUsers] = useState({})
   const [productOptions, setProductOptions] = useState([])
@@ -74,6 +74,7 @@ export default function AuditLogList() {
         branchId: canPickBranch ? selectedBranchId || undefined : undefined,
         userId: active.userId || undefined,
         entityType: active.entityType || undefined,
+        entityId: active.entityId || undefined,
         action: active.action || undefined,
         productId: active.productId || undefined,
         from: active.from || undefined,
@@ -161,6 +162,7 @@ export default function AuditLogList() {
     appliedRef.current = {
       userId: filters.userId,
       entityType: filters.entityType,
+      entityId: filters.entityId,
       action: filters.action,
       productId,
       from: filters.from,
@@ -172,7 +174,7 @@ export default function AuditLogList() {
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS)
     setFilterError('')
-    appliedRef.current = { userId: '', entityType: '', action: '', productId: '', from: '', to: '' }
+    appliedRef.current = { userId: '', entityType: '', entityId: '', action: '', productId: '', from: '', to: '' }
     load(1, appliedRef.current)
   }
 
@@ -221,6 +223,10 @@ export default function AuditLogList() {
             <option value="">{t('audit.allEntities')}</option>
             {ENTITY_TYPES.map((e) => <option key={e} value={e}>{t(`audit.entityTypes.${e}`, { defaultValue: e })}</option>)}
           </select>
+        </label>
+        <label className="text-xs font-bold text-slate-700">
+          {t('audit.entityId')}
+          <input type="number" min="1" step="1" value={filters.entityId} onChange={setFilter('entityId')} placeholder={t('audit.entityIdPlaceholder')} className={inputClass} />
         </label>
         <label className="text-xs font-bold text-slate-700">
           {t('audit.product')}

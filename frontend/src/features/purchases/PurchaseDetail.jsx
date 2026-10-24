@@ -34,6 +34,8 @@ export default function PurchaseDetail() {
   }, [purchaseOrderId, t])
 
   useEffect(() => {
+    // This effect starts the asynchronous API load; the resulting state updates happen after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadOrder()
   }, [loadOrder])
 

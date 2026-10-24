@@ -414,10 +414,11 @@ model Transfer {
 }
 
 model TransferItem {
-  id         Int     @id @default(autoincrement())
-  transferId Int
-  productId  Int
-  quantity   Decimal @db.Decimal(12, 2)
+  id               Int      @id @default(autoincrement())
+  transferId       Int
+  productId        Int
+  quantity         Decimal  @db.Decimal(12, 2)
+  receivedQuantity Decimal? @db.Decimal(12, 2)
 
   transfer Transfer @relation(fields: [transferId], references: [id])
   product  Product  @relation(fields: [productId], references: [id])

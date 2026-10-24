@@ -101,6 +101,7 @@ async function getById(idParam) {
 }
 
 // POST /api/users
+// The route only lets BRANCH_MANAGER, STAFF and AUDITOR through (the system has one Admin).
 // The user and the USER_CREATED audit entry are saved in one transaction.
 async function create({ username, fullName, password, role, branchId = null }, actingUserId) {
   checkBranchRule(role, branchId);
@@ -141,8 +142,18 @@ async function update(idParam, changes, actingUserId) {
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'User not found');
 
-  if (changes.isActive === false && id === actingUserId) {
-    throw validationError('You cannot deactivate your own account', 'isActive', 'invalid', 'not allowed on your own account');
+  if (existing.role === 'ADMIN') {
+    // Contract section 4: the Admin account keeps its role, branch and active state.
+    // Only fullName can change. A field sent with its current value is ignored.
+    const touchesProtected =
+      (changes.role !== undefined && changes.role !== existing.role) ||
+      (changes.branchId !== undefined && changes.branchId !== existing.branchId) ||
+      (changes.isActive !== undefined && changes.isActive !== existing.isActive);
+    if (touchesProtected) {
+      throw new AppError(403, 'FORBIDDEN', 'The Admin account cannot be reassigned or deactivated');
+    }
+  } else if (changes.role === 'ADMIN') {
+    throw validationError('A user cannot be made Admin', 'role', 'invalid', 'ADMIN cannot be assigned');
   }
 
   const role = changes.role !== undefined ? changes.role : existing.role;
@@ -190,11 +201,15 @@ async function update(idParam, changes, actingUserId) {
 }
 
 // POST /api/users/:id/reset-password
-// Not audited: contract 6.8 has no action name for it yet.
+// The Admin account cannot be reset here: the Admin uses change-password (contract section 4).
+// Not audited yet: contract 6.8 has no action name for it.
 async function resetPassword(idParam, newPassword, actingUserId) {
   const id = parseId(idParam);
-  const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'User not found');
+  if (existing.role === 'ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'The Admin password is changed with change-password');
+  }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({ where: { id }, data: { passwordHash } });

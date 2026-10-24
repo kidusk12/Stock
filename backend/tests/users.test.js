@@ -143,7 +143,7 @@ test('GET by id returns the user, and 404 for unknown or bad ids', async () => {
   expect((await adminGet('/api/users/abc')).status).toBe(404);
 });
 
-test('PATCH changes fields, clears the branch for an Admin, and rejects an empty body', async () => {
+test('PATCH changes fields, clears the branch for an Auditor, and rejects an empty body', async () => {
   const created = (await newUser()).body;
   const url = `/api/users/${created.id}`;
 
@@ -153,11 +153,11 @@ test('PATCH changes fields, clears the branch for an Admin, and rejects an empty
 
   expect((await adminPatch(url, {})).status).toBe(400);
 
-  const toAdmin = await adminPatch(url, { role: 'ADMIN' });
-  expect(toAdmin.status).toBe(200);
-  expect(toAdmin.body.role).toBe('ADMIN');
-  expect(toAdmin.body.branchId).toBeNull();
-  expect(toAdmin.body.branchName).toBeNull();
+  const toAuditor = await adminPatch(url, { role: 'AUDITOR' });
+  expect(toAuditor.status).toBe(200);
+  expect(toAuditor.body.role).toBe('AUDITOR');
+  expect(toAuditor.body.branchId).toBeNull();
+  expect(toAuditor.body.branchName).toBeNull();
 
   const backWithoutBranch = await adminPatch(url, { role: 'STAFF' });
   expect(backWithoutBranch.status).toBe(400);
@@ -193,9 +193,8 @@ test('deactivating blocks login and hides the user from the default list', async
 
 test('an Admin cannot deactivate their own account', async () => {
   const res = await adminPatch(`/api/users/${admin.id}`, { isActive: false });
-  expect(res.status).toBe(400);
-  expect(res.body.error.code).toBe('VALIDATION_ERROR');
-
+  expect(res.status).toBe(403);
+  expect(res.body.error.code).toBe('FORBIDDEN');
   expect((await adminGet('/api/auth/me')).status).toBe(200);
 });
 

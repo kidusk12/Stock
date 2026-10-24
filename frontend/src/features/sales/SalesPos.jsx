@@ -16,11 +16,11 @@ import {
 } from 'lucide-react'
 
 export default function SalesPos() {
-  const { user, selectedBranchId } = useAuth()
+  const { user, selectedBranchId, changeBranch } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
 
   const [activeTab, setActiveTab] = useState('pos') // 'pos' or 'history'
+  const [branches, setBranches] = useState([])
   const [products, setProducts] = useState([])
   const [salesHistory, setSalesHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -40,6 +40,37 @@ export default function SalesPos() {
   const [completedInvoice, setCompletedInvoice] = useState(null)
   const [productLoadError, setProductLoadError] = useState('')
   const [historyLoadError, setHistoryLoadError] = useState('')
+
+  // Load branches
+  useEffect(() => {
+    let active = true
+    api.get('/branches')
+      .then((res) => {
+        if (!active) return
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+        setBranches(list)
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  // When All Branches is selected for Admin/Auditor, show yellow notice for 3 seconds before defaulting
+  useEffect(() => {
+    if ((user?.role !== 'ADMIN' && user?.role !== 'AUDITOR') || selectedBranchId) {
+      return undefined
+    }
+
+    const timer = setTimeout(() => {
+      if (!selectedBranchId && branches.length > 0) {
+        const target = branches.find((b) => b.isActive) || branches[0]
+        if (target?.id) {
+          changeBranch(target.id)
+        }
+      }
+    }, 3000)
+
+    return () => clearTimeout(timer)
+  }, [user?.role, selectedBranchId, branches, changeBranch])
 
   useEffect(() => {
     loadProducts()
@@ -202,7 +233,11 @@ export default function SalesPos() {
   const setCartItemQuantity = (productId, value) => {
     const quantity = Number(value)
     const item = cart.find((entry) => entry.productId === productId)
-    if (!item || !Number.isFinite(quantity) || quantity <= 0 || quantity > item.availableStock || !/^\d+(\.\d{1,2})?$/.test(String(value))) {
+    if (item && Number.isFinite(quantity) && quantity > item.availableStock) {
+      setSaleError(t('sales.exceedsStock', { available: item.availableStock }))
+      return
+    }
+    if (!item || !Number.isFinite(quantity) || quantity <= 0 || !/^\d+(\.\d{1,2})?$/.test(String(value))) {
       setSaleError(t('sales.invalidQuantity'))
       return
     }
@@ -293,7 +328,31 @@ export default function SalesPos() {
         </div>
       </div>
 
-      {user?.role === 'ADMIN' && !selectedBranchId && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{t('sales.selectBranch')}</div>}
+      {user?.role === 'ADMIN' && !selectedBranchId && (
+        <div
+          role="status"
+          className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs transition-all animate-fade-in"
+        >
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <span className="font-semibold">{t('sales.selectBranch')}</span>
+          </div>
+          {branches.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {branches.filter((b) => b.isActive).map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => changeBranch(b.id)}
+                  className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100/70 shadow-2xs transition cursor-pointer"
+                >
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {productLoadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{productLoadError}<button type="button" onClick={loadProducts} className="ml-2 font-bold underline">{t('common.retry')}</button></div>}
       {activeTab === 'history' && saleError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saleError}</div>}
 

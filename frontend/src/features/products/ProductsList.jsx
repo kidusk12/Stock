@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../../lib/api'
 import { formatETB } from '../../lib/ethiopianDate'
 import {
-  Boxes,
   Search,
   Plus,
   FileSpreadsheet,
@@ -14,10 +13,29 @@ import {
   Download
 } from 'lucide-react'
 
+const UNIT_OPTIONS = [
+  'piece',
+  'box',
+  'carton',
+  'pack',
+  'bag',
+  'bottle',
+  'kg',
+  'g',
+  'liter',
+  'meter',
+  'roll',
+  'can',
+  'pair',
+  'set',
+  'dozen',
+  'sheet',
+  'bundle',
+]
+
 export default function ProductsList() {
   const { user, selectedBranchId } = useAuth()
   const { t, i18n } = useTranslation()
-  const isAm = i18n.language === 'am'
   const isAdmin = user?.role === 'ADMIN'
 
   const [products, setProducts] = useState([])
@@ -31,7 +49,6 @@ export default function ProductsList() {
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(1)
   const [pageError, setPageError] = useState('')
-  const [stockRows, setStockRows] = useState([])
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false)
@@ -58,6 +75,8 @@ export default function ProductsList() {
   const [importResult, setImportResult] = useState(null)
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef(null)
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -73,7 +92,6 @@ export default function ProductsList() {
         api.get('/stock', { branchId: selectedBranchId || undefined, page: index + 2, limit: 100 })
       )) : []
       const rows = [...(initialStockResult.data || []), ...extraStockPages.flatMap((result) => result.data || [])]
-      setStockRows(rows)
       setTotal(productResult.total ?? productResult.data?.length ?? 0)
       setPageCount(Math.max(1, Math.ceil((productResult.total ?? 0) / (productResult.limit || 20))))
       setProducts((productResult.data || []).map((product) => {
@@ -96,6 +114,8 @@ export default function ProductsList() {
   }, [includeInactive, page, search, selectedBranchId, selectedCat, t])
 
   useEffect(() => {
+    // This effect starts an asynchronous API load; the resulting state updates happen after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts()
   }, [loadProducts])
 
@@ -160,22 +180,32 @@ export default function ProductsList() {
     }
   }
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0]
-    e.target.value = ''
+  const uploadAndPreviewFile = async (file, branchId = importBranchId) => {
     if (!file) return
+
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type && !file.type.includes('csv')) {
+      setImportError(t('products.onlyCsvSupported', { defaultValue: 'Only CSV files are supported (.csv)' }))
+      return
+    }
+
     setImportFile(file)
     setImportResult(null)
+
+    if (!branchId) {
+      setImportError(t('products.selectOpeningBranch', { defaultValue: 'Select a branch to import rows with opening stock.' }))
+      return
+    }
+
     setImportError('')
     setImportBusy(true)
     try {
       const upload = new FormData()
       upload.append('file', file)
-      if (importBranchId) upload.append('branchId', importBranchId)
+      if (branchId) upload.append('branchId', branchId)
       const result = await api.post('/import/products?dryRun=true', upload)
       setImportResult(result)
     } catch (err) {
-      setImportError(err.code === 'VALIDATION_ERROR' && !importBranchId
+      setImportError(err.code === 'VALIDATION_ERROR' && !branchId
         ? t('products.selectOpeningBranch')
         : t(`errors.${err.code}`, { defaultValue: t('products.importError') }))
     } finally {
@@ -183,8 +213,18 @@ export default function ProductsList() {
     }
   }
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) void uploadAndPreviewFile(file)
+  }
+
   const confirmImport = async () => {
     if (!importFile) return
+    if (!importBranchId) {
+      setImportError(t('products.selectOpeningBranch'))
+      return
+    }
     setImportBusy(true)
     setImportError('')
     try {
@@ -227,7 +267,7 @@ export default function ProductsList() {
             {t('products.title')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {isAm ? 'የምርት ካታሎግ፣ ዋጋዎች እና የክምችት መጠን' : 'Product catalog, pricing, and branch stock on hand'}
+            {t('products.description')}
           </p>
         </div>
 
@@ -235,7 +275,16 @@ export default function ProductsList() {
           {user?.role === 'ADMIN' && (
             <>
               <button
-                onClick={() => { setImportFile(null); setImportResult(null); setImportError(''); setImportBranchId(selectedBranchId ? String(selectedBranchId) : ''); setShowImportModal(true) }}
+                onClick={() => {
+                  setImportFile(null);
+                  setImportResult(null);
+                  setImportError('');
+                  const defaultBranch = selectedBranchId
+                    ? String(selectedBranchId)
+                    : (branches.find((b) => b.isActive)?.id ? String(branches.find((b) => b.isActive).id) : '');
+                  setImportBranchId(defaultBranch);
+                  setShowImportModal(true);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
@@ -272,7 +321,7 @@ export default function ProductsList() {
             onChange={(e) => { setSelectedCat(e.target.value); setPage(1) }}
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:border-blue-500 focus:outline-none"
           >
-            <option value="">{isAm ? 'ሁሉም ምድቦች' : 'All Categories'}</option>
+            <option value="">{t('products.allCategories')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -296,7 +345,7 @@ export default function ProductsList() {
               <tr>
                 <th className="py-3.5 px-4">{t('products.name')}</th>
                 <th className="py-3.5 px-4">{t('products.sku')} / {t('products.barcode')}</th>
-                <th className="py-3.5 px-4">{t('products.category')}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{t('products.category')}</th>
                 {user?.role !== 'STAFF' && (
                   <th className="py-3.5 px-4 text-right">{t('products.costPrice')}</th>
                 )}
@@ -327,7 +376,7 @@ export default function ProductsList() {
                       {p.isLowStock && (
                         <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
                           <AlertTriangle className="h-3 w-3" />
-                          {isAm ? 'ዝቅተኛ' : 'Low'}
+                          {t('products.lowStock')}
                         </span>
                       )}
                     </td>
@@ -335,8 +384,8 @@ export default function ProductsList() {
                       <div>{p.sku}</div>
                       {p.barcode && <div className="text-slate-400 text-[10px]">{p.barcode}</div>}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-block whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                         {p.categoryName || '—'}
                       </span>
                     </td>
@@ -409,7 +458,7 @@ export default function ProductsList() {
                     <div className="font-semibold text-slate-800">{bs.branchName}</div>
                     <div className="flex items-center gap-4">
                       <span className="text-slate-500 text-[11px]">
-                        Min: {bs.minQuantity} | Max: {bs.maxQuantity}
+                        {t('stock.minimum')}: {bs.minQuantity} | {t('stock.maximum')}: {bs.maxQuantity}
                       </span>
                       <span className="font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">
                         {bs.quantity} {showBranchModal.unit}
@@ -459,7 +508,7 @@ export default function ProductsList() {
                     maxLength={150}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Sugar 50kg (ስኳር 50 ኪ.ግ)"
+                  placeholder={t('products.exampleName')}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -474,7 +523,7 @@ export default function ProductsList() {
                     maxLength={50}
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="e.g. SUG-50"
+                    placeholder={t('products.exampleSku')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -486,7 +535,7 @@ export default function ProductsList() {
                     maxLength={50}
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    placeholder="e.g. 6001001"
+                    placeholder={t('products.exampleBarcode')}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -510,21 +559,27 @@ export default function ProductsList() {
                 </div>
                 <div>
                   <label htmlFor="product-unit" className="block font-bold text-slate-700 mb-1">{t('products.unit')} *</label>
-                  <input
+                  <select
                     id="product-unit"
-                    type="text"
                     required
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="bag, kg, piece, carton"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  />
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none bg-white"
+                  >
+                    <option value="">{t('products.selectUnit')}</option>
+                    {UNIT_OPTIONS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                    {formData.unit && !UNIT_OPTIONS.includes(formData.unit) && (
+                      <option value={formData.unit}>{formData.unit}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="product-cost" className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB)</label>
+                  <label htmlFor="product-cost" className="block font-bold text-slate-700 mb-1">{t('products.costPrice')} (ETB) *</label>
                   <input
                     id="product-cost"
                     type="number"
@@ -538,7 +593,7 @@ export default function ProductsList() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="product-selling-price" className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB)</label>
+                  <label htmlFor="product-selling-price" className="block font-bold text-slate-700 mb-1">{t('products.sellingPrice')} (ETB) *</label>
                   <input
                     id="product-selling-price"
                     type="number"
@@ -588,17 +643,93 @@ export default function ProductsList() {
             <div className="mt-4 space-y-4 text-xs">
               <p className="text-slate-600">{t('products.importDescription')}</p>
               <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" aria-hidden="true" />{t('products.downloadTemplate')}</button>
-              <label className="block text-sm font-semibold text-slate-700">{t('products.openingStockBranch')}
-                <select value={importBranchId} onChange={(e) => { setImportBranchId(e.target.value); setImportResult(null) }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal">
-                  <option value="">{t('products.noOpeningStock')}</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              <label className="block text-sm font-bold text-slate-700">
+                {t('products.openingStockBranch')}
+                <select
+                  value={importBranchId}
+                  onChange={(e) => {
+                    const newBranch = e.target.value
+                    setImportBranchId(newBranch)
+                    setImportError('')
+                    if (importFile) {
+                      void uploadAndPreviewFile(importFile, newBranch)
+                    } else {
+                      setImportResult(null)
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  required
+                >
+                  <option value="" disabled>
+                    {t('products.selectBranch', { defaultValue: 'Select a branch *' })}
+                  </option>
+                  {branches.filter((branch) => branch.isActive).map((branch) => (
+                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                  ))}
                 </select>
               </label>
-              <div className="rounded-xl border-2 border-dashed border-slate-300 p-5 text-center">
-                <Upload className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
-                <label className="mt-2 block cursor-pointer font-bold text-teal-800">{t('products.chooseCsv')}
-                  <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} className="sr-only" />
-                </label>
-                {importFile && <p className="mt-1 text-slate-500">{importFile.name}</p>}
+
+              {/* Drag and Drop Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(true)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
+                  const droppedFile = e.dataTransfer?.files?.[0]
+                  if (droppedFile) {
+                    void uploadAndPreviewFile(droppedFile)
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all cursor-pointer select-none ${
+                  isDragging
+                    ? 'border-teal-600 bg-teal-50/80 scale-[1.01] ring-4 ring-teal-100'
+                    : 'border-slate-300 hover:border-teal-600/70 hover:bg-slate-50/80 bg-slate-50/40'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileUpload}
+                  className="sr-only"
+                />
+                <Upload
+                  className={`mx-auto h-8 w-8 transition-transform ${
+                    isDragging ? 'text-teal-600 scale-110 animate-bounce' : 'text-slate-400'
+                  }`}
+                  aria-hidden="true"
+                />
+                <p className="mt-2 text-sm font-bold text-teal-800">
+                  {isDragging
+                    ? t('products.dropFileHere', { defaultValue: 'Drop the CSV file here' })
+                    : t('products.dragOrBrowse', { defaultValue: 'Drag & drop your CSV file here, or browse' })}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {t('products.csvOnlyHint', { defaultValue: 'Supports standard CSV format (.csv)' })}
+                </p>
+                {importFile && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-teal-100/70 px-3 py-1.5 text-xs font-semibold text-teal-900 border border-teal-200">
+                    <FileSpreadsheet className="h-4 w-4 text-teal-700" />
+                    <span>{importFile.name}</span>
+                    <span className="text-[10px] text-teal-600">({(importFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                )}
               </div>
               {importError && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{importError}</div>}
               {importBusy && <p className="text-center text-slate-500" role="status">{t('common.loading')}</p>}
