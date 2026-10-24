@@ -8,7 +8,7 @@
 |---|---|
 | Project | Multi-Branch Stock Management System |
 | Date | October 2026 |
-| Team members | Kidus, Makda, Melat, Hemen |
+| Team members | Kidus Kidanewold (Project Leader), Hemen Solomon, Kenzo Stacy, Makda Solomon, Melat Worku |
 
 ---
 
@@ -18,14 +18,14 @@
 
 ## 1.1 Purpose
 
-This document describes the software requirements for the Multi-Branch Stock Management System. It defines what the system must do, how its main functions work, and the qualities it must have. It is the reference for design, development and testing, and the finished system will be checked against it.
+This document describes the software requirements for the Multi-Branch Stock Management System. It defines what the system must do, how its main functions work, and the qualities it must have. It is the reference for design, development and testing, and the finished system has been checked against it. This version describes the system as it was built and tested.
 
 
 ## 1.2 About the Project
 
 Many small and medium businesses in Ethiopia that run several shops or warehouses still track stock on paper or in spreadsheets. This causes familiar problems: quantities that do not match what is on the shelf, no clear view of what each branch holds, stock running out without warning, goods moved between branches without a record, and no way to find out who changed what.
 
-The Multi-Branch Stock Management System is a web application that replaces those paper records and spreadsheets. Each branch keeps its own stock; every change in stock is recorded with who made it and why; managers approve purchases and transfers; and the system warns when a product is running low. It is built for the local context: the interface works in Amharic and English, dates can be shown in the Ethiopian calendar, amounts are in birr, and invoices handle VAT or turnover tax (TOT).
+The Multi-Branch Stock Management System is a web application that replaces those paper records and spreadsheets. Each branch keeps its own stock; every change in stock is recorded with who made it and why; managers approve purchases and transfers; and the system warns when a product is running low. It is built for the local context: the interface works in Amharic and English, dates are shown in the Ethiopian calendar, amounts are in birr, and invoices handle VAT or turnover tax (TOT).
 
 Project goals:
 
@@ -60,7 +60,7 @@ The system is a web-based application that helps companies with one or more bran
 - 17. CSV export
 - 18. CSV import
 
-Features 1 to 12 form the core system and are built first. Features 13 to 18 are extended features built once the core works end to end.
+Features 1 to 12 form the core system and were built first. Features 13 to 18 are extended features built once the core worked end to end. All 18 were delivered.
 
 Out of scope: accounting and payroll, online payment integration, e-commerce storefronts, hardware sensors or automatic counting, native mobile applications, and the items listed in Section 8.2. Invoices produced by the system are printable business invoices; they are not fiscal receipts issued by a certified fiscal (EFD) machine.
 
@@ -79,12 +79,15 @@ Out of scope: accounting and payroll, online payment integration, e-commerce sto
 | CSV | Comma-Separated Values, a plain text table format that opens in Excel |
 | Stock movement | A recorded change in stock quantity (receipt, sale, return, adjustment, transfer, opening stock) |
 | In transit | A transfer that has been shipped by the source branch but not yet received by the destination |
+| Discrepancy | The difference between the quantity shipped in a transfer and the quantity received |
+| Pending refund | A customer return whose money has not yet been marked as given back |
+| Tax-inclusive price | A selling price that already contains VAT or TOT |
 | Audit log | Permanent record of who did what and when in the system |
 
 
 ## 1.5 Document Overview
 
-Section 2 gives an overall description of the product. Section 3 explains how the system and each function work. Section 4 lists the functional requirements. Section 5 lists non-functional requirements. Section 6 covers external interfaces, Section 7 the main data entities, Section 8 priorities, excluded features and milestones, and Section 9 verification and acceptance.
+Section 2 gives an overall description of the product. Section 3 explains how the system and each function work. Section 4 lists the functional requirements. Section 5 lists non-functional requirements. Section 6 covers external interfaces, Section 7 the main data entities, Section 8 priorities, excluded features and milestones, and Section 9 verification, acceptance and test results.
 
 
 # 2. Overall Description
@@ -101,12 +104,12 @@ The system is a standalone client-server web application. A React frontend commu
 - Management of branches, products, categories and suppliers
 - Branch-level stock tracking where every change is recorded as a stock movement
 - Purchase orders with Branch Manager approval, goods receiving and partial receiving
-- Sales with VAT or TOT, printable invoices, and customer returns
+- Sales with VAT or TOT, printable invoices, and customer returns with a refund status
 - Stock adjustments with mandatory reasons
 - Inter-branch stock transfers with request, approval, shipping and receiving
 - Low-stock alerts, in-app notification bell and a Low Stock page
 - Append-only audit trail of all important actions
-- USB barcode scanner input
+- USB barcode scanner input on the sale screen
 - Amharic/English interface, Ethiopian calendar dates and birr currency
 - One role-based dashboard, three reports, CSV export and CSV import
 
@@ -115,10 +118,10 @@ The system is a standalone client-server web application. A React frontend commu
 
 | User | Description | Scope |
 |---|---|---|
-| Admin | Business owner or head office; configures the system and oversees everything | All branches, full control |
-| Branch Manager | Manages one branch; approves purchase orders and transfers; sets stock thresholds | Own branch |
-| Staff | Daily operations: sales, returns, receiving goods, adjustments and transfer handling (storekeeper and cashier duties) | Own branch |
-| Auditor | Reviews logs, movements, adjustments and reports; cannot change any data | Read-only, all branches |
+| Admin | Business owner or head office; the single Admin account configures the system and oversees everything | All branches, full control |
+| Branch Manager | Manages one branch; approves purchase orders and transfers; sets stock thresholds; handles refunds | Own branch |
+| Staff | Daily operations: sales, returns, receiving goods, adjustments and transfer handling (storekeeper and cashier duties). Never sees cost prices, stock value or profit | Own branch |
+| Auditor | Reviews logs, movements, adjustments, reports, sales, purchase orders and transfers; cannot change any data | Read-only, all branches |
 
 
 ## 2.4 Operating Environment
@@ -130,7 +133,7 @@ The system is a standalone client-server web application. A React frontend commu
 
 ## 2.5 Design and Implementation Constraints
 
-- Must be completed and fully working within a 4-week development period by a team of four
+- Must be completed and fully working within a 4-week development period by a team of five
 - Technology stack: React, Tailwind CSS, Node.js, Express, PostgreSQL, Prisma
 - Must handle Amharic (Ge'ez) text correctly using Unicode fonts
 - All stock changes must pass through the stock movement mechanism, never direct edits
@@ -141,7 +144,10 @@ The system is a standalone client-server web application. A React frontend commu
 - Users have basic computer skills and a working network connection to the server
 - Stock data is entered by staff; the system does not detect physical stock automatically
 - A product has a single cost price; stock value is quantity multiplied by cost price
-- Third-party libraries (react-i18next, PapaParse, a charting library) remain available
+- Selling prices entered by the company already include tax (VAT or TOT)
+- Quantities and money amounts have at most two decimal places
+- Dates and times are stored in UTC and shown in Ethiopia time (UTC+3)
+- Third-party libraries used (React, react-i18next, Tailwind CSS, Express, Prisma, zod, bcryptjs, jsonwebtoken, helmet, express-rate-limit, formidable) remain available
 
 
 # 3. How the System Works
@@ -166,9 +172,13 @@ A typical working day looks like this:
 
 ## 3.2 Login and Role-Based Access (Features 1 and 16)
 
-Users log in with a username and password. Passwords are never stored as plain text; they are hashed. After a successful login the server issues a signed token (JWT) that the browser sends with every request. The token carries the user's role and branch.
+Users log in with a username and password. Passwords are never stored as plain text; they are hashed, and a password can be at most 72 characters long. After a successful login the server issues a signed token (JWT) with a limited lifetime (3 hours in the provided configuration) that the browser sends with every request. To slow down password guessing, repeated failed logins are blocked for a while: 5 failed attempts for the same username, or 30 from the same IP address, within 15 minutes. Successful logins are not counted.
 
-What a user can see and do depends on their role. Admins can do everything in all branches. Branch Managers and Staff work only inside their own branch. Auditors can see the audit log, stock movements, adjustments and reports, but cannot create, change or delete anything. Every rule is checked on the server, so a user cannot get around it by calling the system directly. The Admin creates users, assigns each a role and branch, and can deactivate them. Users can change their own password.
+On every request the server also loads the user from the database. A user who has been deactivated is therefore blocked at once, even if their token has not expired, and the user's current role and branch are always the ones applied.
+
+What a user can see and do depends on their role. Admins can do everything in all branches. Branch Managers and Staff work only inside their own branch. Staff never see cost prices, stock value or profit; the server removes these fields from everything it sends to them. Auditors can see the audit log, stock movements, adjustments, reports, sales and invoices, purchase orders and transfers in all branches, but cannot create, change or delete anything. Every rule is checked on the server, so a user cannot get around it by calling the system directly.
+
+The system has one Admin account, provisioned during installation. That account cannot be created, reassigned or deactivated through user management, and its password cannot be reset through user management. For an Admin handover, the incoming person takes over the existing account, changes its password, and updates its name. A forgotten Admin password is recovered with a documented database procedure (see the README). Admins can create, edit and deactivate Branch Manager, Staff and Auditor accounts. Users can change their own password.
 
 
 ## 3.3 Branches, Products, Categories and Suppliers (Feature 2)
@@ -188,7 +198,7 @@ Products can be searched and filtered by name, SKU, barcode or category.
 
 The system keeps a separate quantity for each product in each branch. All changes go through one mechanism, the stock movement service. When a feature needs to change stock, it calls this service with the product, branch, quantity (positive or negative), the type of event and a reference. The service then, in a single database transaction, locks the stock row, refuses the change if it would make the quantity negative, updates the quantity and writes the movement record. If any step fails, nothing is saved.
 
-Movement types are: opening stock, purchase receipt, sale, customer return, adjustment, transfer out and transfer in. Locking the row also means that if two users sell the last unit at the same moment, one succeeds and the other is told there is not enough stock. Users can see stock for one branch or consolidated across all branches, and view the movement history of a product.
+Movement types are: opening stock, purchase receipt, sale, customer return, adjustment, transfer out and transfer in. Locking the row also means that if two users sell the last unit at the same moment, one succeeds and the other is told there is not enough stock. Users can see stock for their branch; the Admin and the Auditor can also see it consolidated across all branches. The movement history of a product can be viewed.
 
 
 ## 3.5 Purchase Orders and Receiving (Features 4, 14 and 15)
@@ -207,9 +217,11 @@ Receiving can be partial. If a supplier delivers 60 of 100 ordered units, staff 
 
 At the counter, staff build a sale by searching for products or scanning their barcodes and entering quantities. They may type a customer name. The system checks each item against the branch's stock and refuses the sale if there is not enough.
 
-The system then calculates the subtotal and the tax. For example, a subtotal of 1,000 birr with VAT at 15% gives 150 birr of VAT and a total of 1,150 birr; if the company uses TOT, the TOT rule is applied instead. When the sale is completed, the sale record, the stock deduction and a unique sequential invoice number are saved together. The printable invoice shows the company name and TIN, the invoice number, the date, the items, the tax and the total, and it can be printed or saved as PDF from the browser.
+Selling prices already include tax. The total of a sale is therefore the sum of its lines (price multiplied by quantity), and the tax is the part of that total that is tax: the total multiplied by the rate and divided by 100 plus the rate. For example, a total of 1,150 birr with VAT at 15% contains 150 birr of VAT, leaving 1,000 birr before tax. If the company uses TOT, its rate is applied in the same way. The tax type, rate and amounts are saved with each sale, so changing the company setting later never changes old invoices.
 
-If a customer brings an item back, staff open the original invoice, choose the items and quantities being returned, and confirm. The system does not allow returning more than was sold (minus anything already returned), puts the items back into stock, and links the return to the invoice.
+When the sale is completed, the sale record, the stock deduction and a unique sequential invoice number are saved together. The printable invoice shows the company name and TIN, the invoice number, the date, the items, the amount before tax, the tax and the total, and it can be printed or saved as PDF from the browser.
+
+If a customer brings an item back, staff open the original invoice, choose the items and quantities being returned, and confirm. The system does not allow returning more than was sold (minus anything already returned), puts the items back into stock, and links the return to the invoice. A return also has a refund status. It starts as pending refund, and when the money has been given back, an Admin, or a Branch Manager or Staff member of that branch, marks it as refunded. This can be done only once per return. Pending refunds are shown on the Admin and Branch Manager dashboards.
 
 
 ## 3.7 Stock Adjustments (Feature 6)
@@ -224,48 +236,49 @@ Transfers move stock from one branch to another with approval and tracking.
 1. Branch B requests stock of one or more products from Branch A (status: requested).
 2. Branch A's manager approves or rejects the request (approved or rejected).
 3. When Branch A ships the goods, the quantity is deducted from Branch A's stock immediately and the transfer is in transit (shipped). Shipping more than the available stock is refused.
-4. When Branch B confirms receipt, the quantity is added to Branch B's stock (received).
+4. When Branch B confirms receipt, it enters the quantity actually received for each product. Only that quantity is added to Branch B's stock (received). By default the full shipped quantity is assumed.
+5. The received quantity cannot be more than the shipped quantity. If less arrived, the difference is recorded as a discrepancy in the stock movement and in the audit log, so it stays visible.
 
 Deducting at shipping and adding at receiving means goods are never counted in two places or in none. The in-transit state is simply a transfer that has been shipped but not yet received.
 
 
 ## 3.9 Low-Stock Alerts and Notifications (Feature 8)
 
-A manager sets a minimum level (and optionally a maximum) for each product in each branch. After any stock decrease (a sale, adjustment or transfer out), the system compares the new quantity with the minimum. If it is at or below the minimum, it creates a notification for that branch's manager. It does not repeat the notification while the product stays low.
+A manager sets a minimum level (and optionally a maximum) for each product in each branch. After any stock decrease (a sale, adjustment or transfer out), the system compares the new quantity with the minimum. If it is at or below the minimum, it creates a notification for that branch. It does not repeat the notification while the product stays low.
 
-The notification bell in the top bar shows the number of unread notifications and lets the user mark them as read. A Low Stock page lists every product at or below its minimum with a suggested reorder quantity: up to the maximum if one is set, otherwise up to twice the minimum.
+The notification bell in the top bar is available to the Admin (all branches) and to Branch Managers (their own branch). It shows the number of unread notifications and lets the user mark them as read. A Low Stock page, available to the same two roles, lists every product at or below its minimum with a suggested reorder quantity: up to the maximum if one is set, otherwise up to twice the minimum. Staff do not see alerts or the Low Stock page.
 
 
 ## 3.10 Audit Log (Feature 9)
 
-The audit log is a permanent record of important actions. Every stock movement is recorded, and so are changes to users, products, prices, suppliers and branches, and purchase order, sale, return, adjustment, transfer and import actions. Each entry stores the user, the time, the action, the branch, and the old and new values. The application has no way to edit or delete entries. Authorized users can search and filter the log by user, product, date range, action and branch.
+The audit log is a permanent record of important actions. Every stock movement is recorded, and so are changes to users, products, prices, suppliers and branches, and purchase order, sale, return, adjustment, transfer and import actions. Each entry stores the user, the time, the action, the branch, and the old and new values. The application has no way to edit or delete entries. The Admin and the Auditor can search and filter the log across all branches by user, product, date range, action and branch; a Branch Manager sees only the entries of their own branch.
 
 
 ## 3.11 USB Barcode Input (Feature 10)
 
-A USB barcode scanner behaves like a keyboard: when it scans a code, it types the digits and presses Enter. The system provides a focused input field on the sale, purchase receipt and transfer screens. When a code is entered, the system looks up the product by barcode and adds it to the current document. If no product matches, it shows a clear "product not found" message. Barcodes can also be typed by hand, so no special hardware is needed to test the system.
+A USB barcode scanner behaves like a keyboard: when it scans a code, it types the digits and presses Enter. The system provides a focused input field on the sale screen. When a code is entered, the system looks up the product by barcode and adds it to the current sale. If no product matches, it shows a clear "product not found" message. Barcodes can also be typed by hand, so no special hardware is needed to test the system. On the purchase receipt and transfer screens, products are chosen without scanning.
 
 
 ## 3.12 Amharic/English, Ethiopian Date and Birr (Feature 11)
 
-Users can switch the whole interface between Amharic and English, and the choice is remembered. All text comes from translation files, so no label is fixed in the code. Dates are stored in the database as standard dates and converted for display in the Ethiopian calendar; for date input, a day, month and year selector is used. Amounts are shown in birr with correct formatting. An Ethiopic Unicode font (such as Noto Sans Ethiopic) ensures Amharic text displays correctly on screen and in printed invoices and reports.
+Users can switch the whole interface between Amharic and English, and the choice is remembered. All text comes from translation files, so no label is fixed in the code. Dates are stored in the database as standard UTC dates and times, and shown on screens, invoices and reports in the Ethiopian calendar and Ethiopia time (UTC+3). Date filters, for example in the reports and the audit log, are entered with the browser's standard date input and sent to the server as standard dates. Amounts are shown in birr with correct formatting. An Ethiopic Unicode font (such as Noto Sans Ethiopic) ensures Amharic text displays correctly on screen and in printed invoices and reports.
 
 
 ## 3.13 Dashboard, Reports and CSV Export (Features 12 and 17)
 
-After login, each user sees one dashboard whose widgets depend on their role. Admins see total stock value, a sales summary, a branch comparison, the low-stock count and recent activity. Branch Managers see their branch's stock value and sales, low-stock items, pending approvals and transfers in transit. Staff see today's sales and invoice count, a search or scan box, expected purchase orders, pending transfers and the low-stock list. Auditors see recent audit activity and recent adjustments.
+After login, each user sees one dashboard whose widgets depend on their role. Admins see total stock value, today's sales, a branch comparison, the low-stock count, pending refunds and recent activity. Branch Managers see their branch's stock value and today's sales, low-stock items, pending approvals (purchase orders and transfers), transfers in transit and pending refunds. Staff see today's sales and invoice count, a product search box, expected purchase orders and pending transfers. Auditors see recent audit activity and recent adjustments.
 
-There are three reports: stock on hand, sales, and stock movement history. Each can be filtered by date range, branch and product, printed or saved as PDF from the browser, and exported to CSV. The CSV export contains the currently filtered rows and is encoded so that Amharic text opens correctly in Excel.
+There are three reports: stock on hand, sales, and stock movement history. They are available to the Admin, to Branch Managers (their own branch) and to the Auditor. Each can be filtered by date range, branch and product, printed or saved as PDF from the browser, and exported to CSV. The CSV export contains all the rows that match the current filters (not only the page on screen) and is encoded so that Amharic text opens correctly in Excel.
 
 
 ## 3.14 CSV Import (Feature 18)
 
-CSV import lets an Admin or Branch Manager add many products at once instead of typing each one. The user downloads a CSV template, fills it in (for example from an Excel sheet saved as CSV) and uploads it.
+CSV import lets the Admin add many products at once instead of typing each one. The Admin downloads a CSV template, fills it in (for example from an Excel sheet saved as CSV) and uploads it.
 
-1. The system reads the file and checks every row for missing required fields, duplicate SKU or barcode (within the file or already in the system) and invalid numbers.
-2. A preview shows the rows, with problem rows highlighted and the reason shown.
-3. After the user confirms, valid rows are imported and invalid rows are skipped and reported.
-4. If the file has an opening quantity column, those quantities are recorded as opening stock movements in the chosen branch.
+1. The system reads the file and checks every row for missing required fields, a category that does not exist, duplicate SKU or barcode (within the file or already in the system) and invalid numbers.
+2. A preview (dry run) shows the rows, with problem rows highlighted and the reason shown. Nothing is saved at this stage.
+3. After the Admin confirms, valid rows are imported in one transaction, and invalid rows are skipped and reported.
+4. If the file has an opening quantity column, those quantities are recorded as opening stock movements in the branch the Admin chooses.
 
 
 # 4. Functional Requirements
@@ -278,12 +291,15 @@ Priority levels: High = required for the core system and must work in the final 
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-AUTH-01 | The system shall allow users to log in with a username and password. | High |
-| FR-AUTH-02 | Passwords shall be stored hashed (bcrypt) and sessions secured with JWT. | High |
-| FR-AUTH-03 | The Admin shall create, edit and deactivate users and assign one of four roles (Admin, Branch Manager, Staff, Auditor) and a branch. | High |
+| FR-AUTH-02 | Passwords shall be stored hashed (bcrypt), shall be at most 72 characters long, and sessions shall be secured with JWT of limited lifetime. | High |
+| FR-AUTH-03 | The system shall have one Admin account provisioned during installation. The Admin shall create, edit and deactivate Branch Manager, Staff and Auditor accounts and assign branches where required. The Admin account shall not be created, reassigned or deactivated through user management; an Admin handover shall use the existing account with changed credentials and profile name. | High |
 | FR-AUTH-04 | The system shall restrict Branch Managers and Staff to their assigned branch. Admin and Auditor may access all branches. | High |
 | FR-AUTH-05 | The system shall enforce permissions on the server for every request, not only in the interface. | High |
 | FR-AUTH-06 | Users shall be able to change their own password and log out. | Medium |
-| FR-AUTH-07 | The Auditor role shall be read-only: it may view the audit log, stock movements, adjustments and reports, and every request that creates, changes or deletes data shall be rejected for it. | Medium |
+| FR-AUTH-07 | The Auditor role shall be read-only: it may view the audit log, stock movements, adjustments, reports, sales and invoices, purchase orders and transfers in all branches, and every request that creates, changes or deletes data shall be rejected for it. | Medium |
+| FR-AUTH-08 | Staff shall never be shown cost prices, stock value or profit. The server shall leave these fields out of every response sent to Staff. | High |
+| FR-AUTH-09 | The system shall temporarily block repeated failed logins: after 5 failed attempts for the same username, or 30 from the same IP address, within 15 minutes, further attempts shall be refused until the period ends. Successful logins shall not be counted. | Medium |
+| FR-AUTH-10 | The server shall load the user from the database on every request, so that a deactivated account is blocked immediately and the user's current role and branch are always applied. | High |
 
 
 ## 4.2 Master Data and Company Settings (Feature 2)
@@ -308,7 +324,7 @@ Priority levels: High = required for the core system and must work in the final 
 | FR-STK-02 | Every change in stock shall be made through the stock movement mechanism and recorded with type (opening stock, purchase receipt, sale, customer return, adjustment, transfer out, transfer in), quantity, reference, reason where applicable, user and time. | High |
 | FR-STK-03 | A stock quantity change and its movement record shall be saved in a single database transaction. | High |
 | FR-STK-04 | The system shall reject any change that would make a stock quantity negative. | High |
-| FR-STK-05 | The system shall show stock consolidated across all branches or filtered by branch. | High |
+| FR-STK-05 | The system shall show stock for a branch. The Admin and the Auditor shall also be able to view stock consolidated across all branches. | High |
 | FR-STK-06 | Users shall be able to view the movement history of a product. | Medium |
 
 
@@ -331,11 +347,13 @@ Priority levels: High = required for the core system and must work in the final 
 | FR-SAL-01 | Staff shall create sales by selecting or scanning products, entering quantities and optionally entering a customer name. | High |
 | FR-SAL-02 | The system shall reject sales that exceed available stock in the branch. | High |
 | FR-SAL-03 | Completing a sale shall deduct stock and record stock movements in the same transaction as the sale record. | High |
-| FR-SAL-04 | The system shall calculate VAT (15%) or TOT according to the company setting and show totals in birr. | High |
+| FR-SAL-04 | The system shall treat selling prices as tax-inclusive, calculate the VAT (15%) or TOT part of the total according to the company setting, and show amounts in birr. | High |
 | FR-SAL-05 | The system shall assign each invoice a unique sequential number. | High |
-| FR-SAL-06 | The system shall generate a printable invoice showing company name, TIN, invoice number, date, items, tax and total. The user may print it or save it as PDF through the browser. | High |
+| FR-SAL-06 | The system shall generate a printable invoice showing company name, TIN, invoice number, date, items, amount before tax, tax and total. The user may print it or save it as PDF through the browser. | High |
 | FR-SAL-07 | Staff shall process customer returns against an original invoice by selecting items and quantities. The returned quantity shall not exceed the quantity sold minus quantities already returned. | Medium |
 | FR-SAL-08 | A customer return shall increase stock, record a stock movement and be linked to the original invoice. | Medium |
+| FR-SAL-09 | The tax type, tax rate and tax amounts shall be stored with each sale, so that later changes to the company setting do not change old invoices. | High |
+| FR-SAL-10 | A customer return shall have a refund status (pending refund or refunded). The Admin, or a Branch Manager or Staff member of the return's branch, shall be able to mark it refunded, once only. | Medium |
 
 
 ## 4.6 Stock Adjustments (Feature 6)
@@ -354,8 +372,9 @@ Priority levels: High = required for the core system and must work in the final 
 | FR-TRF-01 | A branch shall be able to request stock of one or more products from another branch. | High |
 | FR-TRF-02 | The source branch manager shall approve or reject the request. | High |
 | FR-TRF-03 | When the source branch ships an approved transfer, stock shall be deducted from the source and the transfer shall be tracked as in transit. Shipping more than the available stock shall be rejected. | High |
-| FR-TRF-04 | The destination branch shall confirm receipt, at which point stock is added to the destination. | High |
+| FR-TRF-04 | The destination branch shall confirm receipt by entering the quantity received for each product, at which point the received quantity is added to the destination. | High |
 | FR-TRF-05 | Each transfer shall have a status: requested, approved, rejected, shipped or received. | High |
+| FR-TRF-06 | The received quantity of a product shall not exceed the shipped quantity. If it is lower, only the received quantity shall be added, and the difference shall be recorded as a discrepancy in the stock movement and the audit log. | Medium |
 
 
 ## 4.8 Low-Stock Alerts and Notifications (Feature 8)
@@ -363,10 +382,10 @@ Priority levels: High = required for the core system and must work in the final 
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-ALT-01 | The Admin or Branch Manager shall set a minimum threshold (and optional maximum) per product per branch. | High |
-| FR-ALT-02 | After any stock decrease, the system shall compare the quantity with the minimum and create a notification for the branch manager if it is at or below it. | High |
+| FR-ALT-02 | After any stock decrease, the system shall compare the quantity with the minimum and create a notification for the branch if it is at or below it. | High |
 | FR-ALT-03 | The system shall not create repeated notifications for the same product and branch while it remains below the minimum. | Medium |
-| FR-ALT-04 | The system shall show notifications in an in-app notification bell with an unread count and allow marking them as read. | High |
-| FR-ALT-05 | A Low Stock page shall list items at or below their minimum with a suggested reorder quantity (up to the maximum if set, otherwise up to twice the minimum). | High |
+| FR-ALT-04 | The system shall show notifications to the Admin and to Branch Managers in an in-app notification bell with an unread count, and allow marking them as read. | High |
+| FR-ALT-05 | A Low Stock page, available to the Admin and Branch Managers, shall list items at or below their minimum with a suggested reorder quantity (up to the maximum if set, otherwise up to twice the minimum). | High |
 
 
 ## 4.9 Audit Trail (Feature 9)
@@ -375,15 +394,15 @@ Priority levels: High = required for the core system and must work in the final 
 |---|---|---|
 | FR-AUD-01 | The system shall record every stock movement and every important action (user, product, price, supplier and branch changes; purchase order, sale, return, adjustment and transfer actions; imports) with user, time, action, branch, and old and new values. | High |
 | FR-AUD-02 | Audit records shall not be editable or deletable through the application. | High |
-| FR-AUD-03 | Authorized users shall search and filter audit records by user, product, date range, action and branch. | High |
+| FR-AUD-03 | The Admin and the Auditor shall search and filter audit records by user, product, date range, action and branch. A Branch Manager shall see only the records of their own branch. | High |
 
 
 ## 4.10 Barcode Input (Feature 10)
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-BAR-01 | The system shall accept barcode input from a USB scanner (keyboard emulation) in a focused input field. | High |
-| FR-BAR-02 | A scan shall find the product and add it to the current sale, purchase receipt or transfer. | High |
+| FR-BAR-01 | The system shall accept barcode input from a USB scanner (keyboard emulation) in a focused input field on the sale screen. | High |
+| FR-BAR-02 | A scan shall find the product by its barcode and add it to the current sale. | High |
 | FR-BAR-03 | If no product matches the barcode, the system shall show a clear "product not found" message. | High |
 
 
@@ -392,7 +411,7 @@ Priority levels: High = required for the core system and must work in the final 
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-LOC-01 | Users shall switch the interface between Amharic and English, and the choice shall be remembered. | High |
-| FR-LOC-02 | The system shall display dates in the Ethiopian calendar and accept date input through a day, month and year selector, storing dates as standard dates. | High |
+| FR-LOC-02 | The system shall display dates in the Ethiopian calendar and Ethiopia time (UTC+3), storing them as standard UTC dates. Date filters shall accept standard dates through the browser's date input and send them to the server as YYYY-MM-DD. | High |
 | FR-LOC-03 | Currency shall be displayed in birr with correct formatting. | High |
 | FR-LOC-04 | All interface text shall come from translation files so that no label is fixed in the code. | High |
 
@@ -402,24 +421,25 @@ Priority levels: High = required for the core system and must work in the final 
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-DSH-01 | After login the system shall load a single dashboard whose widgets depend on the user's role. | High |
-| FR-DSH-02 | Admin widgets: total stock value, sales summary, branch comparison, low-stock count, recent activity. | High |
-| FR-DSH-03 | Branch Manager widgets: branch stock value and sales, low-stock items, pending approvals (purchase orders and transfers), transfers in transit. | High |
-| FR-DSH-04 | Staff widgets: today's sales and invoice count, product search or scan box, expected purchase orders, pending transfers, low-stock list. | High |
+| FR-DSH-02 | Admin widgets: total stock value, today's sales, branch comparison, low-stock count, pending refunds, recent activity. | High |
+| FR-DSH-03 | Branch Manager widgets: branch stock value and today's sales, low-stock items, pending approvals (purchase orders and transfers), transfers in transit, pending refunds. | High |
+| FR-DSH-04 | Staff widgets: today's sales and invoice count, product search box, expected purchase orders, pending transfers. | High |
 | FR-DSH-05 | Auditor widgets: recent audit activity and recent adjustments (read-only). | Medium |
 | FR-REP-01 | The system shall provide three reports: stock on hand, sales, and stock movement history. | High |
 | FR-REP-02 | Reports shall be filterable by date range, branch and product where applicable. | High |
 | FR-REP-03 | Reports shall have a print-friendly layout that can be printed or saved as PDF through the browser. | Medium |
-| FR-REP-04 | Users shall export the currently filtered report to a CSV file encoded so that Amharic text opens correctly in Excel. | Medium |
+| FR-REP-04 | Users shall export a report to a CSV file containing all rows that match the current filters, encoded so that Amharic text opens correctly in Excel. | Medium |
+| FR-REP-05 | Reports shall be available to the Admin, to Branch Managers (own branch only) and to the Auditor. | High |
 
 
 ## 4.13 CSV Import (Feature 18)
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-IMP-01 | The Admin and Branch Manager shall upload a CSV file of products. | Medium |
-| FR-IMP-02 | The system shall validate each row (missing required fields, duplicate SKU or barcode in the file or in the system, invalid numbers) and show a preview with errors highlighted. | Medium |
+| FR-IMP-01 | The Admin shall upload a CSV file of products. | Medium |
+| FR-IMP-02 | The system shall validate each row (missing required fields, category that does not exist, duplicate SKU or barcode in the file or in the system, invalid numbers) and show a preview with errors highlighted, without saving anything. | Medium |
 | FR-IMP-03 | Valid rows shall be imported only after user confirmation; invalid rows shall be skipped and reported. | Medium |
-| FR-IMP-04 | If the file contains an opening quantity column, the quantities shall be recorded as opening stock movements in the selected branch. | Medium |
+| FR-IMP-04 | If the file contains an opening quantity column, the quantities shall be recorded as opening stock movements in the branch the Admin selects. | Medium |
 | FR-IMP-05 | The system shall provide a downloadable CSV import template. | Medium |
 
 
@@ -427,14 +447,14 @@ Priority levels: High = required for the core system and must work in the final 
 
 | ID | Category | Requirement |
 |---|---|---|
-| NFR-01 | Performance | As a design goal, common pages and searches shall respond within 2 seconds with the demonstration data (several branches and several hundred products). |
-| NFR-02 | Security | Passwords hashed; server-side role checks on every request; input validation on all endpoints; database access through Prisma (parameterized queries); output escaping in the interface; the JWT sent in the Authorization header; HTTPS when deployed. |
+| NFR-01 | Performance | As a design goal, common pages and searches shall respond within 2 seconds with the demonstration data (several branches and several hundred products). Measured results are in Section 9.2. |
+| NFR-02 | Security | Passwords hashed; server-side role checks on every request; input validation on all endpoints; database access through Prisma (parameterized queries); output escaping in the interface; the JWT sent in the Authorization header and limited in lifetime; login attempts limited (FR-AUTH-09); security headers (helmet); cross-origin requests accepted only from the frontend address; request size limited and client mistakes answered with 400 or 413, not server errors; HTTPS, production settings and a long random JWT secret when deployed. |
 | NFR-03 | Data Integrity | Stock quantity changes and their movement records shall be written in a single database transaction so they never become inconsistent. |
-| NFR-04 | Concurrency | Simultaneous sales or transfers of the same product shall not produce negative stock; the stock mechanism shall lock the affected stock row during the change. |
-| NFR-05 | Backup | A database backup script shall be provided and tested. |
+| NFR-04 | Concurrency | Simultaneous sales or transfers of the same product shall not produce negative stock; the stock mechanism shall lock the affected stock row during the change. Repeating the same action at the same moment (receiving, approving, returning) shall take effect once only. |
+| NFR-05 | Backup | A database backup script and a restore procedure shall be provided (see the README) and tested. |
 | NFR-06 | Usability | The interface shall be simple and consistent; a trained user shall be able to create a sale in under one minute; all screens shall work in Amharic and English. |
 | NFR-07 | Compatibility | Responsive design that works on desktop and tablet browsers and remains usable on phone-size screens. |
-| NFR-08 | Maintainability | Modular code, separate frontend and backend layers, version control with reviewed pull requests, and a documented API. |
+| NFR-08 | Maintainability | Modular code, separate frontend and backend layers, version control with reviewed pull requests, automated tests, and a documented API. |
 | NFR-09 | Scalability | The design shall allow adding branches, products and users without changes to the code structure. |
 | NFR-10 | Auditability | All critical actions shall be traceable to a user and timestamp, with logs protected from modification through the application. |
 | NFR-11 | Localization | Ge'ez text shall display correctly using a Unicode font such as Noto Sans Ethiopic, including in printed invoices and reports. |
@@ -447,7 +467,7 @@ Priority levels: High = required for the core system and must work in the final 
 ## 6.1 User Interface
 
 - Web interface with a shared layout, a sidebar menu filtered by role and a notification bell
-- Language toggle, forms with validation messages, searchable tables and charts on the dashboard
+- Language toggle, forms with validation messages, searchable tables and summary widgets on the dashboard
 - Print-friendly invoice and report layouts
 
 
@@ -459,7 +479,7 @@ Priority levels: High = required for the core system and must work in the final 
 
 ## 6.3 Software Interfaces
 
-- REST API between frontend and backend using JSON
+- REST API between frontend and backend using JSON (documented in `docs/api-contract.md`)
 - PostgreSQL database accessed through Prisma ORM
 
 
@@ -470,7 +490,7 @@ Priority levels: High = required for the core system and must work in the final 
 
 # 7. Data Requirements
 
-Main data entities (the detailed schema and ERD are produced during design):
+Main data entities. The full schema is in `backend/prisma/schema.prisma`.
 
 | Entity | Purpose |
 |---|---|
@@ -482,9 +502,9 @@ Main data entities (the detailed schema and ERD are produced during design):
 | branch_stock | Current quantity per product per branch, with minimum and optional maximum thresholds |
 | stock_movements | Every change in stock (the source of truth for history) |
 | purchase_orders (+ items) | Orders to suppliers, approval status, ordered and received quantities per item |
-| sales (+ items) | Sales and their invoices, with an optional customer name |
-| sale_returns (+ items) | Customer returns linked to the original sale |
-| transfers (+ items) | Inter-branch transfers with status |
+| sales (+ items) | Sales and their invoices, with an optional customer name and the tax type, rate and amounts at the time of sale |
+| sale_returns (+ items) | Customer returns linked to the original sale, with a refund status |
+| transfers (+ items) | Inter-branch transfers with status, shipped and received quantities |
 | adjustments | Stock adjustments with reason |
 | notifications | Low-stock alerts |
 | audit_logs | Append-only action history |
@@ -495,23 +515,23 @@ Main data entities (the detailed schema and ERD are produced during design):
 
 ## 8.1 Priorities and Build Order
 
-Features 1 to 12 are the core system and are completed first. Features 13 to 18 are added once the core works end to end. If time runs short, extended features are cut in the order listed in Section 8.3; core features are never cut.
+Features 1 to 12 are the core system and were completed first. Features 13 to 18 were added once the core worked end to end.
 
 | # | Feature | Phase | Requirements |
 |---|---|---|---|
-| 1 | Login and role-based access | Core | FR-AUTH-01 to 06 |
+| 1 | Login and role-based access | Core | FR-AUTH-01 to 06, 08 to 10 |
 | 2 | Branches, products, categories, suppliers | Core | FR-PRD, FR-SUP, FR-BR, FR-SET |
 | 3 | Branch stock and stock movement service | Core | FR-STK-01 to 06 |
 | 4 | Purchase orders and receiving | Core | FR-PUR-01, 02, 04, 05 |
-| 5 | Sales with VAT and printable invoice | Core | FR-SAL-01 to 06 |
+| 5 | Sales with VAT and printable invoice | Core | FR-SAL-01 to 06, 09 |
 | 6 | Stock adjustments | Core | FR-ADJ-01 to 03 |
-| 7 | Inter-branch transfers | Core | FR-TRF-01 to 05 |
+| 7 | Inter-branch transfers | Core | FR-TRF-01 to 06 |
 | 8 | Low-stock alerts and notification bell | Core | FR-ALT-01 to 05 |
 | 9 | Audit log | Core | FR-AUD-01 to 03 |
 | 10 | USB barcode input | Core | FR-BAR-01 to 03 |
 | 11 | Amharic/English, Ethiopian date, birr | Core | FR-LOC-01 to 04 |
-| 12 | One dashboard and three reports | Core | FR-DSH-01 to 04, FR-REP-01, 02 |
-| 13 | Customer returns | Extended | FR-SAL-07, 08 |
+| 12 | One dashboard and three reports | Core | FR-DSH-01 to 04, FR-REP-01, 02, 05 |
+| 13 | Customer returns | Extended | FR-SAL-07, 08, 10 |
 | 14 | PO approval by Branch Manager | Extended | FR-PUR-03 |
 | 15 | Partial receiving | Extended | FR-PUR-06 |
 | 16 | Auditor role | Extended | FR-AUTH-07, FR-DSH-05 |
@@ -530,19 +550,23 @@ The following are intentionally not part of this project, to keep the delivery c
 | Supplier returns | Lower value; customer returns are supported. |
 | Customer management | Sales accept an optional customer name instead. |
 | Phone-camera barcode scanning | Needs HTTPS and real-device testing; USB scanner input is supported. |
+| Barcode scanning on purchase receipt and transfer screens | Scanning is on the sale screen, where it matters most. |
+| Ethiopian-calendar day, month and year selector for date filters | Dates are shown in the Ethiopian calendar; filters use the browser's standard date input. |
 | Email alerts | Needs an external mail service; in-app notifications are used. |
 | Excel and PDF export libraries | CSV export and the browser's print-to-PDF cover the need. |
 | Product images | File storage adds work without functional value. |
 | Separate Storekeeper and Cashier roles and separate dashboards per role | Merged into one Staff role and one role-based dashboard. |
 | Purchases, transfers, profit and count-variance reports | Reduced to three reports. |
+| Admin password reset through the application | The Admin account is protected; a forgotten password is recovered with the documented database procedure. |
+| Forced password change after a reset | Needs an extra database column; decided against. |
 
 
-## 8.3 If Time Is Short
+## 8.3 Delivery Status
 
-Extended features are cut in this order: CSV import, partial receiving, customer returns, PO approval, CSV export. The Auditor role is a permission setting and is kept if possible.
+All 18 features were completed. The cut order agreed in advance in case time ran short (CSV import, partial receiving, customer returns, PO approval, CSV export) was not needed.
 
 
-## 8.4 Milestones
+## 8.4 Milestones (Plan)
 
 | Period | Goal |
 |---|---|
@@ -550,14 +574,15 @@ Extended features are cut in this order: CSV import, partial receiving, customer
 | Week 1 | Foundations: database, stock movement service, authentication and permissions, application shell and translations, master data. |
 | Week 2 | Core features: purchasing, sales and invoices, adjustments, transfers, alerts, audit log, barcode input. All 12 core features work end to end. |
 | Week 3 | Extended features, dashboard, reports and demonstration data. Feature freeze at the end of the week. |
-| Week 4 | Testing by team members on features they did not build, bug fixing, Amharic completion, documentation and demonstration rehearsal. |
+| Week 4 | Testing by team members on features they did not build, security, performance and concurrency testing, bug fixing, Amharic completion, documentation and demonstration rehearsal. |
 
 
 ## 8.5 Possible Future Enhancements
 
 - FIFO or average cost valuation
 - Physical stock counts with reconciliation
-- Phone-camera barcode scanning
+- Phone-camera barcode scanning, and scanning on receiving and transfer screens
+- Ethiopian-calendar date selector for filters
 - Email alerts
 - Excel and PDF export
 - Supplier returns and customer management
@@ -566,22 +591,43 @@ Extended features are cut in this order: CSV import, partial receiving, customer
 - Telebirr / CBE Birr payment integration
 - Native mobile application
 - Batch and expiry-date tracking
+- Running several server processes and a shared rate-limit store for larger deployments
 
 
 # 9. Verification and Acceptance
 
-Each feature is accepted when it works end to end, works in both languages, is enforced on the server, and has been tested by a team member who did not build it. The demonstration uses seeded data: at least three branches, one user for each role, and 200 or more products with sample purchases, sales and transfers.
+
+## 9.1 Acceptance Scenarios
+
+Each feature is accepted when it works end to end, works in both languages, is enforced on the server, and has been tested by a team member who did not build it. The demonstration uses seeded data: at least three branches, one user for each role, and 200 or more products with sample purchases, sales and transfers (the demonstration data set, loaded with `npm run seed:demo`). The basic seed (`npm run seed`) creates two branches, four users and 25 products for development and for the automated tests.
 
 | # | Acceptance scenario | Requirements |
 |---|---|---|
 | A1 | A user logs in; a Staff user cannot open an Admin-only page, and the server rejects the same request sent directly. | FR-AUTH-01, 03, 04, 05 |
-| A2 | Selling more than the available stock is rejected; a valid sale reduces stock and creates a numbered invoice with correct VAT. | FR-SAL-02 to 06, FR-STK-04 |
+| A2 | Selling more than the available stock is rejected; a valid sale reduces stock and creates a numbered invoice showing the amount before tax, the VAT and the total. | FR-SAL-02 to 06, FR-STK-04 |
 | A3 | Two simultaneous sales of the last unit result in one success and one rejection; stock never goes negative. | NFR-03, NFR-04 |
 | A4 | A purchase order is approved, partially received twice, and then shows as received; stock increases each time. | FR-PUR-02 to 06 |
-| A5 | A transfer is requested, approved, shipped (source stock drops, status in transit) and received (destination stock rises). | FR-TRF-01 to 05 |
+| A5 | A transfer is requested, approved, shipped (source stock drops, status in transit) and received (destination stock rises by the received quantity; receiving more than was shipped is rejected, and a shortfall is recorded as a discrepancy). | FR-TRF-01 to 06 |
 | A6 | A sale that brings stock to the minimum creates one notification; the bell and the Low Stock page show it. | FR-ALT-01 to 05 |
-| A7 | A customer return cannot exceed the quantity sold; a valid return increases stock. | FR-SAL-07, 08 |
+| A7 | A customer return cannot exceed the quantity sold; a valid return increases stock and can be marked refunded once. | FR-SAL-07, 08, 10 |
 | A8 | Every action above appears in the audit log, which can be filtered and cannot be edited; an Auditor can view but not change anything. | FR-AUD-01 to 03, FR-AUTH-07 |
 | A9 | The whole interface switches between Amharic and English; dates show in the Ethiopian calendar and amounts in birr. | FR-LOC-01 to 04 |
-| A10 | A report is filtered and exported to CSV that opens correctly in Excel; a CSV file of products is imported with invalid rows highlighted and skipped. | FR-REP-02, 04, FR-IMP-01 to 05 |
+| A10 | A report is filtered and exported to CSV that opens correctly in Excel; the Admin imports a CSV file of products with invalid rows highlighted and skipped. | FR-REP-02, 04, FR-IMP-01 to 05 |
 
+
+## 9.2 Test Results
+
+Tests were run on 23 and 24 October 2026 on a local machine (4 physical cores), against a separate test database. The production-style database was backed up first and never touched.
+
+| Area | What was tested | Result |
+|---|---|---|
+| Authentication | 30 wrong passwords in a row, forged and tampered tokens, a deactivated user's token, password storage | No limit existed at first; a login limiter was added and re-tested. Forged tokens rejected, passwords stored as bcrypt hashes, deactivated users blocked at once. |
+| Access control | All 46 endpoints with no token, a fake token and each of the 4 roles (276 checks); users of one branch attacking another (52 checks); unfiltered lists on 13 endpoints; cost fields hidden from Staff on 8 endpoints; Auditor writes | All passed. No holes found. |
+| Input handling | SQL injection strings, 18 malformed sale payloads, stored script injection, malformed CSV files (up to 20,000 rows) | No injection or script execution. Three cases that returned server errors (a huge id, a 2 MB body, a null byte) were fixed and now return 400 or 413. |
+| Concurrency | 7 scenarios: 20 users selling the last unit; 100 simultaneous sales; the same return, receipt, approval and shipment repeated 10 times; two adjustments against 5 units; a tax rate change during 30 sales | All passed. No overselling, no duplicate or missing invoice numbers, no negative stock, and every sale used the tax rate in force when it was made. |
+| Load | 10, 50 and 100 simultaneous users for 2 minutes each | 99% of requests faster than 104 ms, 112 ms and 228 ms; 0% errors. |
+| Stress and spike | 150 simultaneous users; a jump from 5 to 150 users and back | 0% errors. At 150 users, 95% of requests took 2.0 to 3.2 seconds, slower than the 2-second goal. The system recovered by itself after the spike. The limit on this laptop lies between 100 and 150 users, because the server runs as a single process. |
+| Soak | 30 minutes with 50 users (43,372 requests) | No crash and no memory leak. 2 requests failed (0.005%). |
+| Automated tests | Jest suites for every backend module | 210 of 211 tests passed at the last full run. The failing test was a test-design problem in the reports suite and has since been corrected. |
+
+Not yet tested: a large-data test (thousands of products, 100,000 sales), the 250 and 400 user stress levels, and the deployed environment (HTTPS, production database user, firewall). Known limitations are listed in the README.
