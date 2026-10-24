@@ -158,7 +158,11 @@ test('Manager sees own branch only, Auditor can see all branches, and Staff is f
   const auditor = await get(tokens.auditor, `${URL}/sales`);
   expect(auditor.status).toBe(200);
   expect(auditor.body.total).toBeGreaterThanOrEqual(2);
-  expect(auditor.body.data.some((sale) => sale.branchId === ids.branchB)).toBe(true);
+  // Ask for Branch B directly: the unfiltered first page can hold only newer sales from other tests
+  const auditorB = await get(tokens.auditor, `${URL}/sales?branchId=${ids.branchB}`);
+  expect(auditorB.status).toBe(200);
+  expect(auditorB.body.total).toBeGreaterThanOrEqual(1);
+  expect(auditorB.body.data.every((sale) => sale.branchId === ids.branchB)).toBe(true);
   expect((await get(tokens.staff, `${URL}/stock`)).status).toBe(403);
   expect((await request(app).get(`${URL}/stock`)).status).toBe(401);
 });
