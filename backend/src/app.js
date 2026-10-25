@@ -7,6 +7,7 @@ const routes = require('./routes');
 const { notFound, errorHandler } = require('./middleware/errors');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // --- global middleware ---
 app.use(helmet());
