@@ -117,7 +117,7 @@ backend/   Express API, Prisma schema and migrations, tests
 frontend/  React app (screens, components, translations in src/i18n)
 docs/      SRS, API contract, test report
 ```
-
+## Project Explaining Video - https://drive.google.com/file/d/1jBCPf26irjYjoc7_Y5e3WrrLBvOHleb7/view?usp=sharing
 ## Documents
 
 - [`docs/srs.md`](docs/srs.md): software requirements specification
