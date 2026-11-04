@@ -106,6 +106,8 @@ The system was tested for security, performance and data integrity on 23 to 24 O
 - Behind a proxy, set `app.set('trust proxy', 1)`.
 - Use HTTPS, a database user with limited rights, and regular backups.
 - Keep a written recovery procedure for the Admin account, because the Admin password cannot be reset through the API.
+## Deployed Site
+https://berhanstock.netlify.app/
 
 ## Project structure
 
@@ -117,7 +119,8 @@ backend/   Express API, Prisma schema and migrations, tests
 frontend/  React app (screens, components, translations in src/i18n)
 docs/      SRS, API contract, test report
 ```
-## Project Explaining Video - https://drive.google.com/file/d/1jBCPf26irjYjoc7_Y5e3WrrLBvOHleb7/view?usp=sharing
+## Project Explaining Video :
+- https://drive.google.com/file/d/1jBCPf26irjYjoc7_Y5e3WrrLBvOHleb7/view?usp=sharing
 ## Documents
 
 - [`docs/srs.md`](docs/srs.md): software requirements specification
